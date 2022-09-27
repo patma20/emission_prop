@@ -14,7 +14,7 @@ import warnings
 from thermo import Mixture
 from openmdao.api import Group, IndepVarComp
 from openconcept.utilities.dvlabel import DVLabel
-from openconcept.components.heat_exchanger import (
+from openconcept.thermal.heat_exchanger import (
     OffsetStripFinGeometry,
     HydraulicDiameterReynoldsNumber,
     OffsetStripFinData,

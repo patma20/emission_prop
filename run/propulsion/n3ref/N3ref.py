@@ -18,6 +18,7 @@ class N3(pyc.Cycle):
 
     def initialize(self):
         self.options.declare('cooling', default=False, desc='If True, calculate cooling flow values.')
+        self.options.declare("use_h2", default=False, types=bool, desc="If True, use hydrogen as the fuel.")
 
         super().initialize()
 
@@ -32,7 +33,11 @@ class N3(pyc.Cycle):
         else: 
             self.options['thermo_method'] = 'CEA'
             self.options['thermo_data'] = pyc.species_data.janaf
-            FUEL_TYPE = "Jet-A(g)"
+
+            if self.options["use_h2"]:
+                FUEL_TYPE = "H2"
+            else:
+                FUEL_TYPE = "Jet-A(g)"
         
         cooling = self.options['cooling']
         design = self.options['design']
@@ -343,13 +348,16 @@ class MPN3(pyc.MPCycle):
                               desc='Name of subsystems to add to beginning of order.')
         self.options.declare('statics', default=True,
                               desc='Tells the model whether or not to connect areas.')
+        self.options.declare("use_h2", default=False,
+                              desc="If True, tells the model to use hydrogen fuel.")
 
         super().initialize()
 
     def setup(self):
+        use_h2 = self.options["use_h2"]
 
         # TOC POINT (DESIGN)
-        self.pyc_add_pnt('TOC', N3(), promotes_inputs=[('fan.PR', 'fan:PRdes'), ('lpc.PR', 'lpc:PRdes'), 
+        self.pyc_add_pnt('TOC', N3(use_h2=use_h2), promotes_inputs=[('fan.PR', 'fan:PRdes'), ('lpc.PR', 'lpc:PRdes'), 
                                                         ('opr_calc.FPR', 'fan:PRdes'), ('opr_calc.LPCPR', 'lpc:PRdes')])
 
         # POINT 1: Top-of-climb (TOC)
@@ -419,7 +427,7 @@ class MPN3(pyc.MPCycle):
         self.od_recoveries = [0.9970, 0.9950, 0.9980]
 
         for i, pt in enumerate(self.od_pts):
-            self.pyc_add_pnt(pt, N3(design=False, cooling=self.cooling[i]))
+            self.pyc_add_pnt(pt, N3(design=False, use_h2=use_h2, cooling=self.cooling[i]))
 
             self.set_input_defaults(pt+'.fc.MN', val=self.od_MNs[i])
             self.set_input_defaults(pt+'.fc.alt', val=self.od_alts[i], units='ft')
@@ -518,7 +526,7 @@ def N3ref_model():
 
     prob = om.Problem()
 
-    prob.model = MPN3()
+    prob.model = MPN3(use_h2=True)
 
     # setup the optimization
     prob.driver = om.ScipyOptimizeDriver()
@@ -600,7 +608,7 @@ if __name__ == "__main__":
     st = time.time()
 
     prob.set_solver_print(level=-1)
-    prob.set_solver_print(level=2, depth=1)
+    prob.set_solver_print(level=2, depth=2)
     prob.run_model()
 
     for pt in ['TOC']+prob.model.od_pts:
