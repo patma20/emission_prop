@@ -14,7 +14,7 @@ import openmdao.api as om
 import pycycle.api as pyc
 
 # from openconcept.components.heat_exchanger import HXGroup as HeatExchanger
-from openconcept.components.thermal import LiquidCooledComp, CoolantReservoir
+from openconcept.thermal import LiquidCooledComp, CoolantReservoir
 from openmdao.api import IndepVarComp
 
 # ==============================================================================
