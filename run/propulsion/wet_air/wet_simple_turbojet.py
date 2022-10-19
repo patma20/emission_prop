@@ -4,7 +4,9 @@ import openmdao.api as om
 
 import pycycle.api as pyc
 
-# import numpy as np
+import numpy as np
+
+import matplotlib.pyplot as plt
 
 from injector import Injector
 
@@ -27,7 +29,7 @@ class WetTurbojet(pyc.Cycle):
         # mix_ratio_name is just a descriptive variable name for the reactant-air ratio
 
         inlet = self.add_subsystem("inlet", pyc.Inlet())
-        inject = self.add_subsystem("inject", Injector(reactant="Water", mix_ratio_name="mix:ratio"))
+        inject = self.add_subsystem("inject", Injector(reactant="Water", mix_name="mix"))
         self.add_subsystem("comp", pyc.Compressor(map_data=pyc.AXI5), promotes_inputs=["Nmech"])
 
         self.add_subsystem("burner", pyc.Combustor(fuel_type="JP-7"))
@@ -181,8 +183,10 @@ class MPWetTurbojet(pyc.MPCycle):
         self.pyc_add_cycle_param("inject.dPqP", 0.03)
         self.pyc_add_cycle_param("nozz.Cv", 0.99)
         self.pyc_add_cycle_param("fc.WAR", 0.0001)
+        self.pyc_add_cycle_param("inject.mix:W", 0.1, units="lbm/s")
+        # self.pyc_add_cycle_param("inject.mix:h", 10.0, units="Btu/lbm")
         # self.pyc_add_cycle_param("inject.mix:ratio", 0.01)
-        self.pyc_add_cycle_param("inject.mdot_r", 10.0, units="lbm/s")
+        # self.pyc_add_cycle_param("inject.mdot_r", 10.0, units="lbm/s")  # add for-loop to determine upper limit
 
         # self.od_pts = ["OD1"]
         # self.od_MNs = [0.000001]
@@ -237,7 +241,25 @@ if __name__ == "__main__":
 
     prob.set_solver_print(level=-1)
     prob.set_solver_print(level=2, depth=1)
-    prob.run_model()
+
+    n = 10
+    w_inject = np.linspace(0.000001, 2.0, n)
+    h_inject = np.linspace(0.0, 100.0, n)
+    TSFC = np.zeros(n)
+
+    for i, w in enumerate(w_inject):
+
+        # prob["DESIGN.inject.mix:W"] = w
+        prob["DESIGN.inject.mix:h"] = w
+        prob.run_model()
+        TSFC[i] = prob.get_val("DESIGN.perf.TSFC")
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(h_inject, TSFC)
+    # plt.xlabel("Water Mass Flow Rate (lbm/s)")
+    plt.xlabel("Specific Enthalpy of Injected Water (Btu/lbm)")
+    plt.ylabel("TSFC")
+    plt.savefig("w_TSFC_h.pdf")
 
     # for pt in ["DESIGN"] + mp_wet_turbojet.od_pts:
     #     viewer(prob, pt)
@@ -255,17 +277,23 @@ if __name__ == "__main__":
     # print(n2 / o2)
     # print("sum", np.sum(prod_concs))
 
+    # print(prob.model.DESIGN.burner.Fl_I_data["Fl_I"])
+
     inlet_prod_names = prob.model.DESIGN.inlet.real_flow.base_thermo.thermo.products
     inlet_prod_concs = prob.model.DESIGN.inlet.real_flow.base_thermo.chem_eq._outputs["n"]
 
-    # inject_prod_names = prob.model.DESIGN.inject.vitiated_flow.base_thermo.thermo.products
-    # inject_prod_concs = prob.model.DESIGN.inject.vitiated_flow.base_thermo.chem_eq._outputs["n"]
+    # print(prob.model.DESIGN.burner.mix_fuel._inputs["mix:h"])
+
+    # print(vars(prob.model.DESIGN.burner.mix_fuel))
+
+    inject_prod_names = prob.model.DESIGN.inject.vitiated_flow.base_thermo.thermo.products
+    inject_prod_concs = prob.model.DESIGN.inject.vitiated_flow.base_thermo.chem_eq._outputs["n"]
 
     for i in range(len(inlet_prod_names)):
         if inlet_prod_names[i] == "H2O":
             print(inlet_prod_names[i], inlet_prod_concs[i])
-        # if inject_prod_names[i] == "H2O":
-        #     print(inject_prod_names[i], inject_prod_concs[i])
+        if inject_prod_names[i] == "H2O":
+            print(inject_prod_names[i], inject_prod_concs[i])
 
     print()
     print("time", time.time() - st)

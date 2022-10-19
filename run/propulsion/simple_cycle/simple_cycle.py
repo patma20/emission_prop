@@ -24,16 +24,16 @@ class Duct(pyc.Cycle):
             "fc", pyc.FlightConditions(composition=pyc.CEA_AIR_COMPOSITION, reactant="Water", mix_ratio_name="WAR")
         )
         inlet = self.add_subsystem("inlet", pyc.Inlet())
-        inject = self.add_subsystem("inject", Injector(reactant="Water", mix_ratio_name="mix:ratio"))
+        inject = self.add_subsystem("inject", Injector(reactant="Water", mix_name="mix"))
         duct = self.add_subsystem("duct", pyc.Duct())
         nozz = self.add_subsystem("nozz", pyc.Nozzle(nozzType="CV", lossCoef="Cv"))
         self.add_subsystem("perf", pyc.Performance(num_nozzles=1, num_burners=0))
 
-        # indvars = self.add_subsystem("thermal_params", om.IndepVarComp(), promotes_outputs=["*"])
-        # indvars.add_output("heat_load", 50.0, units="W")
+        indvars = self.add_subsystem("thermal_params", om.IndepVarComp(), promotes_outputs=["*"])
+        indvars.add_output("heat_load", 50.0, units="W")
 
         # Thermodynamic connections
-        # self.connect("heat_load", "duct.Q_dot")
+        self.connect("heat_load", "duct.Q_dot")
 
         # Connnect nozzle exhaust to freestream static conditions
         self.connect("fc.Fl_O:stat:P", "nozz.Ps_exhaust")
@@ -85,7 +85,8 @@ class MPDuct(pyc.MPCycle):
         self.pyc_add_cycle_param("nozz.Cv", 0.99)
         self.pyc_add_cycle_param("fc.WAR", 0.001)
         # self.pyc_add_cycle_param("inject.mix:ratio", 0.01)
-        self.pyc_add_cycle_param("inject.mdot_r", 10.0, units="lbm/s")
+        self.pyc_add_cycle_param("inject.mix:W", 10.0, units="lbm/s")
+        self.pyc_add_cycle_param("inject.mix:h", 10.0, units="Btu/lbm")
 
         # self.od_pts = ["OD1"]
         # self.od_MNs = [0.000001]
