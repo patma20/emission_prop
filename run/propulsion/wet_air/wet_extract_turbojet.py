@@ -35,6 +35,7 @@ class WetTurbojet(pyc.Cycle):
 
         self.add_subsystem("burner", pyc.Combustor(fuel_type="JP-7"))
         turb = self.add_subsystem("turb", pyc.Turbine(map_data=pyc.LPT2269), promotes_inputs=["Nmech"])
+        extract = self.add_subsystem("extract", WaterBleed())
         self.add_subsystem("nozz", pyc.Nozzle(nozzType="CD", lossCoef="Cv"))
         self.add_subsystem("shaft", pyc.Shaft(num_ports=2), promotes_inputs=["Nmech"])
         self.add_subsystem("perf", pyc.Performance(num_nozzles=1, num_burners=1))
@@ -46,7 +47,8 @@ class WetTurbojet(pyc.Cycle):
         # self.pyc_connect_flow("inlet.Fl_O", "comp.Fl_I")
         self.pyc_connect_flow("comp.Fl_O", "burner.Fl_I")
         self.pyc_connect_flow("burner.Fl_O", "turb.Fl_I")
-        self.pyc_connect_flow("turb.Fl_O", "nozz.Fl_I")
+        self.pyc_connect_flow("turb.Fl_O", "extract.Fl_I")
+        self.pyc_connect_flow("extract.Fl_O", "nozz.Fl_I")
 
         # Connect turbomachinery elements to shaft
         self.connect("comp.trq", "shaft.trq_0")
@@ -93,7 +95,9 @@ class WetTurbojet(pyc.Cycle):
             self.connect("nozz.Throat:stat:area", "balance.lhs:W")
 
         # Setup solver to converge engine
-        self.set_order(["balance", "fc", "inlet", "inject", "comp", "burner", "turb", "nozz", "shaft", "perf"])
+        self.set_order(
+            ["balance", "fc", "inlet", "inject", "comp", "burner", "turb", "extract", "nozz", "shaft", "perf"]
+        )
 
         newton = self.nonlinear_solver = om.NewtonSolver()
         newton.options["atol"] = 1e-6
@@ -178,12 +182,15 @@ class MPWetTurbojet(pyc.MPCycle):
         self.set_input_defaults("DESIGN.comp.MN", 0.20),
         self.set_input_defaults("DESIGN.burner.MN", 0.20),
         self.set_input_defaults("DESIGN.turb.MN", 0.4),
+        self.set_input_defaults("DESIGN.extract.MN", 0.4),
         self.set_input_defaults("DESIGN.inject.MN", 0.60),
 
         self.pyc_add_cycle_param("burner.dPqP", 0.03)
         self.pyc_add_cycle_param("inject.dPqP", 0.03)
+        self.pyc_add_cycle_param("extract.dPqP", 0.0)
         self.pyc_add_cycle_param("nozz.Cv", 0.99)
         self.pyc_add_cycle_param("fc.WAR", 0.0001)
+        self.pyc_add_cycle_param("extract.sub_flow.w_frac", 0.1)
         self.pyc_add_cycle_param("inject.mix:W", 0.1, units="lbm/s")
         # self.pyc_add_cycle_param("inject.mix:h", 10.0, units="Btu/lbm")
         # self.pyc_add_cycle_param("inject.mix:ratio", 0.01)
@@ -244,105 +251,41 @@ if __name__ == "__main__":
     prob.set_solver_print(level=2, depth=1)
     prob.run_model()
 
-    # n = 10
-    # w_inject = np.linspace(0.000001, 2.0, n)
-    # h_inject = np.linspace(0.0, 100.0, n)
-    # TSFC = np.zeros(n)
+    nozz_prod_names = prob.model.DESIGN.nozz.ideal_flow.base_thermo.thermo.products
+    nozz_prod_concs = prob.model.DESIGN.nozz.ideal_flow.base_thermo.chem_eq._outputs["n"]
 
-    # for i, w in enumerate(w_inject):
-
-    #     # prob["DESIGN.inject.mix:W"] = w
-    #     prob["DESIGN.inject.mix:h"] = w
-    #     prob.run_model()
-    #     TSFC[i] = prob.get_val("DESIGN.perf.TSFC")
-
-    # plt.figure(figsize=(8, 6))
-    # plt.plot(h_inject, TSFC)
-    # # plt.xlabel("Water Mass Flow Rate (lbm/s)")
-    # plt.xlabel("Specific Enthalpy of Injected Water (Btu/lbm)")
-    # plt.ylabel("TSFC")
-    # plt.savefig("w_TSFC_h.pdf")
-
-    # for pt in ["DESIGN"] + mp_wet_turbojet.od_pts:
-    #     viewer(prob, pt)
-
-    # prod_names = prob.model.DESIGN.inlet.real_flow.base_thermo.thermo.products
-    # prod_concs = prob.model.DESIGN.inlet.real_flow.base_thermo.chem_eq._outputs["n"]
-
-    # for i in range(len(prod_names)):
-    #     print(prod_names[i], prod_concs[i])
-    #     if prod_names[i] == "N2":
-    #         n2 = prod_concs[i]
-    #     if prod_names[i] == "O2":
-    #         o2 = prod_concs[i]
-
-    # print(n2 / o2)
-    # print("sum", np.sum(prod_concs))
-
-    # print(prob.model.DESIGN.inlet.Fl_I_data["Fl_I"])
-    # print(prob.model.DESIGN.inject.Fl_I_data["Fl_I"])
-    # print(prob.model.DESIGN.inject.Fl_O_data["Fl_O"])
-    # print(prob.model.DESIGN.nozz.Fl_I_data["Fl_I"])
-
-    # inlet_prod_names = prob.model.DESIGN.inlet.real_flow.base_thermo.thermo.products
-    # inlet_prod_concs = prob.model.DESIGN.inlet.real_flow.base_thermo.chem_eq._outputs["n"]
-
-    # print(prob.model.DESIGN.burner.mix_fuel._inputs["mix:h"])
-
-    # print(vars(prob.model.DESIGN.burner.mix_fuel))
-
-    # inject_prod_names = prob.model.DESIGN.inject.vitiated_flow.base_thermo.thermo.products
-    # inject_prod_concs = prob.model.DESIGN.inject.vitiated_flow.base_thermo.chem_eq._outputs["n"]
     turb_prod_names = prob.model.DESIGN.turb.real_flow.base_thermo.thermo.products
     turb_prod_concs = prob.model.DESIGN.turb.real_flow.base_thermo.chem_eq._outputs["n"]
 
-    # for i in range(len(inlet_prod_names)):
-    #     if inlet_prod_names[i] == "H2O":
-    #         print(inlet_prod_names[i], inlet_prod_concs[i])
-    #     if inject_prod_names[i] == "H2O":
-    #         print(inject_prod_names[i], inject_prod_concs[i])
-    # comps = prob["DESIGN.nozz.Fl_I:tot:composition"]
-    # print("Nozzle Composition", comps)
-    # print(prob["DESIGN.nozz.Fl_O_data"])
-    nozz_prod_names = prob.model.DESIGN.nozz.ideal_flow.base_thermo.thermo.products
-    nozz_prod_concs = prob.model.DESIGN.nozz.ideal_flow.base_thermo.chem_eq._outputs["n"]
-    # nozz_concs = prob.model.DESIGN.nozz.Fl_I_data
-    # nozz_concs = prob.model.DESIGN.nozz.ideal_flow.base_thermo.thermo.elements
-    # nozz_wts = prob.model.DESIGN.nozz.ideal_flow.base_thermo.thermo.element_wt
+    print(prob.get_val("extract.sub_flow.w_frac"))
+    print("Flow In:", prob["DESIGN.extract.Fl_I:stat:W"])
+    print("Flow Out:", prob["DESIGN.extract.Wout"])
+    print("Water out:", prob["DESIGN.extract.W_water"])
+    print("In Comp:", prob["DESIGN.extract.Fl_I:tot:composition"])
+    print("Out Comp:", prob["DESIGN.extract.composition_out"])
 
-    # for i in range(len(inlet_prod_names)):
-    #     if inlet_prod_names[i] == "H2O":
-    #         print(inlet_prod_names[i], inlet_prod_concs[i])
-    #     if inject_prod_names[i] == "H2O":
-    #         print(inject_prod_names[i], inject_prod_concs[i])
-    # if prod_names[i] == "N2":
-    #     n2 = prod_concs[i]
-    # if prod_names[i] == "O2":
-    #     o2 = prod_concs[i]
+    # print((prob.model.DESIGN.extract.updated_flow.base_thermo.thermo.a))
+    # print(dir(prob.model.DESIGN.nozz.ideal_flow.base_thermo.thermo))
+    # print((prob.model.DESIGN.nozz.ideal_flow.base_thermo.thermo))
+    # print(prob.get_val("DESIGN.extract.init_flow.base_thermo.chem_eq.n"))
 
-    # print(sorted(nozz_concs["Fl_I"]))
-    # print(nozz_concs)
-    # print(nozz_wts)
-
-    # print(prob.model.DESIGN.nozz.ideal_flow.base_thermo.thermo.prod_data)
-
-    # print(n2 / o2)
-    # print("sum", np.sum(prod_concs))
-
-    # print("initial concs:", comps)
-    # print("Normalized concs:", comps / np.linalg.norm(comps))
-
-    print(100 * "#")
-    for n, e in zip(nozz_prod_names, nozz_prod_concs):
-        if e < 10e-9:
-            e = 0.0
-        print(n, e)
-
-    print(100 * "#")
+    # print(100 * "#")
+    print("Turbine molar concentrations (before water extraction)")
+    nozz_prod_concs /= np.sum(nozz_prod_concs)
+    turb_prod_concs /= np.sum(turb_prod_concs)
     for n, e in zip(turb_prod_names, turb_prod_concs):
-        if e < 10e-9:
+        if e < 10e-10:
             e = 0.0
-        print(n, e)
+        else:
+            print(n, e)
+
+    # print(100 * "#")
+    print("Nozzle molar concentrations (after water extraction)")
+    for n, e in zip(nozz_prod_names, nozz_prod_concs):
+        if e < 10e-10:
+            e = 0.0
+        else:
+            print(n, e)
 
     print()
     print("time", time.time() - st)

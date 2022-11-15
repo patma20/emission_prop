@@ -16,7 +16,7 @@ from N3_LPT_map import LPTMap
 
 class N3(pyc.Cycle):
     def initialize(self):
-        self.options.declare('cooling', default=False, desc='If True, calculate cooling flow values.')
+        self.options.declare("cooling", default=False, desc="If True, calculate cooling flow values.")
         self.options.declare("use_h2", default=False, types=bool, desc="If True, use hydrogen as the fuel.")
 
         super().initialize()
@@ -29,88 +29,124 @@ class N3(pyc.Cycle):
             self.options["thermo_method"] = "TABULAR"
             self.options["thermo_data"] = pyc.AIR_JETA_TAB_SPEC
             FUEL_TYPE = "FAR"
-        else: 
-            self.options['thermo_method'] = 'CEA'
-            self.options['thermo_data'] = pyc.species_data.janaf
+        else:
+            self.options["thermo_method"] = "CEA"
+            self.options["thermo_data"] = pyc.species_data.janaf
 
             if self.options["use_h2"]:
                 FUEL_TYPE = "H2"
             else:
                 FUEL_TYPE = "Jet-A(g)"
-        
-        cooling = self.options['cooling']
-        design = self.options['design']
 
-        self.add_subsystem('fc', pyc.FlightConditions())
-        self.add_subsystem('inlet', pyc.Inlet())
-        self.add_subsystem('fan', pyc.Compressor(map_data=FanMap, map_extrap=True,
-                                                 bleed_names=[]),
-                           promotes_inputs=[('Nmech','Fan_Nmech')])
-        self.add_subsystem('splitter', pyc.Splitter())
-        self.add_subsystem('duct2', pyc.Duct(expMN=2.0, ))
-        self.add_subsystem('lpc', pyc.Compressor(map_data=LPCMap, map_extrap=True), promotes_inputs=[('Nmech','LP_Nmech')])
-        self.add_subsystem('bld25', pyc.BleedOut(bleed_names=['sbv']))
-        self.add_subsystem('duct25', pyc.Duct(expMN=2.0, ))
-        self.add_subsystem('hpc', pyc.Compressor(map_data=HPCMap, map_extrap=True,
-                                        bleed_names=['bld_inlet','bld_exit','cust']),
-                           promotes_inputs=[('Nmech','HP_Nmech')])
-        self.add_subsystem('bld3', pyc.BleedOut(bleed_names=['bld_inlet','bld_exit']))
-        self.add_subsystem('burner', pyc.Combustor(fuel_type=FUEL_TYPE))
-        self.add_subsystem('hpt', pyc.Turbine(map_data=HPTMap, map_extrap=True,
-                                              bleed_names=['bld_inlet','bld_exit']),
-                           promotes_inputs=[('Nmech','HP_Nmech')])
-        self.add_subsystem('duct45', pyc.Duct(expMN=2.0, ))
-        self.add_subsystem('lpt', pyc.Turbine(map_data=LPTMap, map_extrap=True,
-                                              bleed_names=['bld_inlet','bld_exit']),
-                           promotes_inputs=[('Nmech','LP_Nmech')])
-        self.add_subsystem('duct5', pyc.Duct(expMN=2.0, ))
-        self.add_subsystem('core_nozz', pyc.Nozzle(nozzType='CV', lossCoef='Cv', ))
+        cooling = self.options["cooling"]
+        design = self.options["design"]
 
-        self.add_subsystem('byp_bld', pyc.BleedOut(bleed_names=['bypBld']))
-        self.add_subsystem('duct17', pyc.Duct(expMN=2.0, ))
-        self.add_subsystem('byp_nozz', pyc.Nozzle(nozzType='CV', lossCoef='Cv', ))
+        self.add_subsystem("fc", pyc.FlightConditions())
+        inlet = self.add_subsystem("inlet", pyc.Inlet())
+        self.add_subsystem(
+            "fan",
+            pyc.Compressor(map_data=FanMap, map_extrap=True, bleed_names=[]),
+            promotes_inputs=[("Nmech", "Fan_Nmech")],
+        )
+        self.add_subsystem("splitter", pyc.Splitter())
+        self.add_subsystem("duct2", pyc.Duct(expMN=2.0))
+        self.add_subsystem(
+            "lpc", pyc.Compressor(map_data=LPCMap, map_extrap=True), promotes_inputs=[("Nmech", "LP_Nmech")]
+        )
+        self.add_subsystem("bld25", pyc.BleedOut(bleed_names=["sbv"]))
+        self.add_subsystem("duct25", pyc.Duct(expMN=2.0))
+        self.add_subsystem(
+            "hpc",
+            pyc.Compressor(map_data=HPCMap, map_extrap=True, bleed_names=["bld_inlet", "bld_exit", "cust"]),
+            promotes_inputs=[("Nmech", "HP_Nmech")],
+        )
+        self.add_subsystem("bld3", pyc.BleedOut(bleed_names=["bld_inlet", "bld_exit"]))
+        self.add_subsystem("burner", pyc.Combustor(fuel_type=FUEL_TYPE))
+        self.add_subsystem(
+            "hpt",
+            pyc.Turbine(map_data=HPTMap, map_extrap=True, bleed_names=["bld_inlet", "bld_exit"]),
+            promotes_inputs=[("Nmech", "HP_Nmech")],
+        )
+        duct45 = self.add_subsystem("duct45", pyc.Duct(expMN=2.0))
+        self.add_subsystem(
+            "lpt",
+            pyc.Turbine(map_data=LPTMap, map_extrap=True, bleed_names=["bld_inlet", "bld_exit"]),
+            promotes_inputs=[("Nmech", "LP_Nmech")],
+        )
+        self.add_subsystem("duct5", pyc.Duct(expMN=2.0))
+        self.add_subsystem("core_nozz", pyc.Nozzle(nozzType="CV", lossCoef="Cv"))
 
-        self.add_subsystem('fan_shaft', pyc.Shaft(num_ports=2), promotes_inputs=[('Nmech','Fan_Nmech')])
-        self.add_subsystem('gearbox', pyc.Gearbox(), promotes_inputs=[('N_in','LP_Nmech'), ('N_out','Fan_Nmech')])
-        self.add_subsystem('lp_shaft', pyc.Shaft(num_ports=3), promotes_inputs=[('Nmech','LP_Nmech')])
-        self.add_subsystem('hp_shaft', pyc.Shaft(num_ports=2), promotes_inputs=[('Nmech','HP_Nmech')])
-        self.add_subsystem('perf', pyc.Performance(num_nozzles=2, num_burners=1))
+        self.add_subsystem("byp_bld", pyc.BleedOut(bleed_names=["bypBld"]))
+        self.add_subsystem("duct17", pyc.Duct(expMN=2.0))
+        self.add_subsystem("byp_nozz", pyc.Nozzle(nozzType="CV", lossCoef="Cv"))
 
-        self.connect('inlet.Fl_O:tot:P', 'perf.Pt2')
-        self.connect('hpc.Fl_O:tot:P', 'perf.Pt3')
-        self.connect('burner.Wfuel', 'perf.Wfuel_0')
-        self.connect('inlet.F_ram', 'perf.ram_drag')
-        self.connect('core_nozz.Fg', 'perf.Fg_0')
-        self.connect('byp_nozz.Fg', 'perf.Fg_1')
+        self.add_subsystem("fan_shaft", pyc.Shaft(num_ports=2), promotes_inputs=[("Nmech", "Fan_Nmech")])
+        self.add_subsystem("gearbox", pyc.Gearbox(), promotes_inputs=[("N_in", "LP_Nmech"), ("N_out", "Fan_Nmech")])
+        self.add_subsystem("lp_shaft", pyc.Shaft(num_ports=3), promotes_inputs=[("Nmech", "LP_Nmech")])
+        self.add_subsystem("hp_shaft", pyc.Shaft(num_ports=2), promotes_inputs=[("Nmech", "HP_Nmech")])
+        self.add_subsystem("perf", pyc.Performance(num_nozzles=2, num_burners=1))
 
-        self.connect('fan.trq', 'fan_shaft.trq_0')
-        self.connect('gearbox.trq_out', 'fan_shaft.trq_1')
-        self.connect('gearbox.trq_in', 'lp_shaft.trq_0')
-        self.connect('lpc.trq', 'lp_shaft.trq_1')
-        self.connect('lpt.trq', 'lp_shaft.trq_2')
-        self.connect('hpc.trq', 'hp_shaft.trq_0')
-        self.connect('hpt.trq', 'hp_shaft.trq_1')
-        self.connect('fc.Fl_O:stat:P', 'core_nozz.Ps_exhaust')
-        self.connect('fc.Fl_O:stat:P', 'byp_nozz.Ps_exhaust')
+        self.connect("inlet.Fl_O:tot:P", "perf.Pt2")
+        self.connect("hpc.Fl_O:tot:P", "perf.Pt3")
+        self.connect("burner.Wfuel", "perf.Wfuel_0")
+        self.connect("inlet.F_ram", "perf.ram_drag")
+        self.connect("core_nozz.Fg", "perf.Fg_0")
+        self.connect("byp_nozz.Fg", "perf.Fg_1")
 
-        self.add_subsystem('ext_ratio', om.ExecComp('ER = core_V_ideal * core_Cv / ( byp_V_ideal *  byp_Cv )',
-                        core_V_ideal={'value':1000.0, 'units':'ft/s'},
-                        core_Cv={'value':0.98, 'units':None},
-                        byp_V_ideal={'value':1000.0, 'units':'ft/s'},
-                        byp_Cv={'value':0.98, 'units':None},
-                        ER={'value':1.4, 'units':None}))
+        self.connect("fan.trq", "fan_shaft.trq_0")
+        self.connect("gearbox.trq_out", "fan_shaft.trq_1")
+        self.connect("gearbox.trq_in", "lp_shaft.trq_0")
+        self.connect("lpc.trq", "lp_shaft.trq_1")
+        self.connect("lpt.trq", "lp_shaft.trq_2")
+        self.connect("hpc.trq", "hp_shaft.trq_0")
+        self.connect("hpt.trq", "hp_shaft.trq_1")
+        self.connect("fc.Fl_O:stat:P", "core_nozz.Ps_exhaust")
+        self.connect("fc.Fl_O:stat:P", "byp_nozz.Ps_exhaust")
 
-        self.connect('core_nozz.ideal_flow.V', 'ext_ratio.core_V_ideal')
-        self.connect('byp_nozz.ideal_flow.V', 'ext_ratio.byp_V_ideal')
+        self.add_subsystem(
+            "ext_ratio",
+            om.ExecComp(
+                "ER = core_V_ideal * core_Cv / ( byp_V_ideal *  byp_Cv )",
+                core_V_ideal={"val": 1000.0, "units": "ft/s"},
+                core_Cv={"val": 0.98, "units": None},
+                byp_V_ideal={"val": 1000.0, "units": "ft/s"},
+                byp_Cv={"val": 0.98, "units": None},
+                ER={"val": 1.4, "units": None},
+            ),
+        )
 
+        self.connect("core_nozz.ideal_flow.V", "ext_ratio.core_V_ideal")
+        self.connect("byp_nozz.ideal_flow.V", "ext_ratio.byp_V_ideal")
 
-        main_order = ['fc', 'inlet', 'fan', 'splitter', 'duct2', 'lpc', 'bld25', 'duct25', 'hpc', 'bld3', 'burner', 'hpt', 'duct45',
-                            'lpt', 'duct5', 'core_nozz', 'byp_bld', 'duct17', 'byp_nozz', 'gearbox', 'fan_shaft', 'lp_shaft', 'hp_shaft',
-                            'perf', 'ext_ratio']
+        main_order = [
+            "fc",
+            "inlet",
+            "fan",
+            "splitter",
+            "duct2",
+            "lpc",
+            "bld25",
+            "duct25",
+            "hpc",
+            "bld3",
+            "burner",
+            "hpt",
+            "duct45",
+            "lpt",
+            "duct5",
+            "core_nozz",
+            "byp_bld",
+            "duct17",
+            "byp_nozz",
+            "gearbox",
+            "fan_shaft",
+            "lp_shaft",
+            "hp_shaft",
+            "perf",
+            "ext_ratio",
+        ]
 
-
-
-        balance = self.add_subsystem('balance', om.BalanceComp())
+        balance = self.add_subsystem("balance", om.BalanceComp())
 
         if design:
 
@@ -159,10 +195,10 @@ class N3(pyc.Cycle):
                 "hpc_CS",
                 om.ExecComp(
                     "CS = Win *(power(Tout/518.67,0.5)/(Pout/14.696))",
-                    Win={"value": 10.0, "units": "lbm/s"},
-                    Tout={"value": 14.696, "units": "degR"},
-                    Pout={"value": 518.67, "units": "psi"},
-                    CS={"value": 10.0, "units": "lbm/s"},
+                    Win={"val": 10.0, "units": "lbm/s"},
+                    Tout={"val": 14.696, "units": "degR"},
+                    Pout={"val": 518.67, "units": "psi"},
+                    CS={"val": 10.0, "units": "lbm/s"},
                 ),
             )
             self.connect("duct25.Fl_O:stat:W", "hpc_CS.Win")
@@ -177,9 +213,9 @@ class N3(pyc.Cycle):
                 "fan_dia",
                 om.ExecComp(
                     "FanDia = 2.0*(area/(pi*(1.0-hub_tip**2.0)))**0.5",
-                    area={"value": 7000.0, "units": "inch**2"},
-                    hub_tip={"value": 0.3125, "units": None},
-                    FanDia={"value": 100.0, "units": "inch"},
+                    area={"val": 7000.0, "units": "inch**2"},
+                    hub_tip={"val": 0.3125, "units": None},
+                    FanDia={"val": 100.0, "units": "inch"},
                 ),
             )
             self.connect("inlet.Fl_O:stat:area", "fan_dia.area")
@@ -188,10 +224,10 @@ class N3(pyc.Cycle):
                 "opr_calc",
                 om.ExecComp(
                     "OPR_simple = FPR*LPCPR*HPCPR",
-                    FPR={"value": 1.3, "units": None},
-                    LPCPR={"value": 3.0, "units": None},
-                    HPCPR={"value": 14.0, "units": None},
-                    OPR_simple={"value": 55.0, "units": None},
+                    FPR={"val": 1.3, "units": None},
+                    LPCPR={"val": 3.0, "units": None},
+                    HPCPR={"val": 14.0, "units": None},
+                    OPR_simple={"val": 55.0, "units": None},
                 ),
             )
 
@@ -384,14 +420,10 @@ def viewer(prob, pt, file=sys.stdout):
 
 class MPN3(pyc.MPCycle):
     def initialize(self):
-        self.options.declare('order_add', default=[],
-                              desc='Name of subsystems to add to end of order.')
-        self.options.declare('order_start', default=[],
-                              desc='Name of subsystems to add to beginning of order.')
-        self.options.declare('statics', default=True,
-                              desc='Tells the model whether or not to connect areas.')
-        self.options.declare("use_h2", default=False,
-                              desc="If True, tells the model to use hydrogen fuel.")
+        self.options.declare("order_add", default=[], desc="Name of subsystems to add to end of order.")
+        self.options.declare("order_start", default=[], desc="Name of subsystems to add to beginning of order.")
+        self.options.declare("statics", default=True, desc="Tells the model whether or not to connect areas.")
+        self.options.declare("use_h2", default=False, desc="If True, tells the model to use hydrogen fuel.")
 
         super().initialize()
 
@@ -400,8 +432,16 @@ class MPN3(pyc.MPCycle):
 
         # TOC POINT (DESIGN)
 
-        self.pyc_add_pnt('TOC', N3(use_h2=use_h2), promotes_inputs=[('fan.PR', 'fan:PRdes'), ('lpc.PR', 'lpc:PRdes'), 
-                                                        ('opr_calc.FPR', 'fan:PRdes'), ('opr_calc.LPCPR', 'lpc:PRdes')])
+        self.pyc_add_pnt(
+            "TOC",
+            N3(use_h2=use_h2),
+            promotes_inputs=[
+                ("fan.PR", "fan:PRdes"),
+                ("lpc.PR", "lpc:PRdes"),
+                ("opr_calc.FPR", "fan:PRdes"),
+                ("opr_calc.LPCPR", "lpc:PRdes"),
+            ],
+        )
 
         # POINT 1: Top-of-climb (TOC)
         self.set_input_defaults("TOC.fc.alt", 35000.0, units="ft"),
@@ -543,9 +583,9 @@ class MPN3(pyc.MPCycle):
             "T4_ratio",
             om.ExecComp(
                 "TOC_T4 = RTO_T4*TR",
-                RTO_T4={"value": 3400.0, "units": "degR"},
-                TOC_T4={"value": 3150.0, "units": "degR"},
-                TR={"value": 0.926470588, "units": None},
+                RTO_T4={"val": 3400.0, "units": "degR"},
+                TOC_T4={"val": 3150.0, "units": "degR"},
+                TR={"val": 0.926470588, "units": None},
             ),
             promotes_inputs=["RTO_T4"],
         )
@@ -611,7 +651,7 @@ if __name__ == "__main__":
     prob.set_val("TOC.balance.rhs:hpc_PR", 53.6332)
 
     # Set up the specific cycle parameters
-    prob.set_val("fan:PRdes", 1.300),
+    prob.set_val("fan:PRdes", 1.3),  # lower=1.2, upper=1.36
     prob.set_val("lpc:PRdes", 3.000),
     prob.set_val("T4_ratio.TR", 0.926470588)
     prob.set_val("RTO_T4", 3400.0, units="degR")
@@ -663,5 +703,21 @@ if __name__ == "__main__":
 
     for pt in ["TOC"] + prob.model.od_pts:
         viewer(prob, pt)
+
+    # inlet_prod_names = prob.model.TOC.inlet.real_flow.base_thermo.thermo.products
+    # inlet_prod_concs = prob.model.TOC.inlet.real_flow.base_thermo.chem_eq._outputs["n"]
+
+    # duct_prod_names = prob.model.TOC.duct45.real_flow.base_thermo.thermo.products
+    # duct_prod_concs = prob.model.TOC.duct45.real_flow.base_thermo.chem_eq._outputs["n"]
+
+    # print(inlet_prod_names)
+    # print(inlet_prod_concs)
+
+    # print(duct_prod_names)
+    # print(duct_prod_concs)
+
+    # for i in range(len(inlet_prod_names)):
+    #     if inlet_prod_names[i] == "H2O":
+    #         print(inlet_prod_names[i], inlet_prod_concs[i])
 
     print("time", time.time() - st)

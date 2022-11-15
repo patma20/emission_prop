@@ -1,15 +1,17 @@
 import sys
-import os
+
+# import os
 import pickle as pkl
 import numpy as np
 
 import openmdao.api as om
 
 import pycycle.api as pyc
-import pycycle.constants as con
-import matplotlib.pyplot as plt
 
-from components.emissions import NOxT4, NOxFit, NOxHum, EINOx
+# import pycycle.constants as con
+# import matplotlib.pyplot as plt
+
+from components.emissions import NOxT4, NOxHum, EINOx
 
 from small_core_eff_balance import SmallCoreEffBalance
 
@@ -606,6 +608,7 @@ class MPN3(pyc.MPCycle):
         self.connect("RTO.balance.hpt_chrg_cool_frac", "CRZ.bld3.bld_exit:frac_W")
         self.connect("RTO.balance.hpt_nochrg_cool_frac", "CRZ.bld3.bld_inlet:frac_W")
 
+        # T4 Ratio
         self.add_subsystem(
             "T4_ratio",
             om.ExecComp(
@@ -623,10 +626,10 @@ class MPN3(pyc.MPCycle):
         indvars.add_output("H_OD", 0.001)
         indvars.add_output("H_SLS", 0.007)
         self.add_subsystem("EINOx", EINOx())
-        self.connect("SLS.bld3.Fl_O:stat:P", "EINOx.P3_SLS")
-        self.connect("SLS.bld3.Fl_O:stat:T", "EINOx.T3_SLS")
+        self.connect("SLS.bld3.Fl_O:tot:P", "EINOx.P3_SLS")
+        self.connect("SLS.bld3.Fl_O:tot:T", "EINOx.T3_SLS")
         self.connect("SLS.balance.FAR", "EINOx.FAR_SLS")
-        self.connect("CRZ.bld3.Fl_O:stat:P", "EINOx.P3_OD")
+        self.connect("CRZ.bld3.Fl_O:tot:P", "EINOx.P3_OD")
         self.connect("CRZ.balance.FAR", "EINOx.FAR_OD")
         self.connect("H_OD", "EINOx.h_OD")
         self.connect("H_SLS", "EINOx.h_SLS")
@@ -752,27 +755,55 @@ if __name__ == "__main__":
 
     prob.set_solver_print(level=-1)
     prob.set_solver_print(level=2, depth=1)
-    prob.run_model()
+    # prob.run_model()
 
-    n = 10
+    n = 2
     hum = np.linspace(0.000001, 0.007, n)
     # h_inject = np.linspace(0.0, 100.0, n)
     NOx_SLS = np.zeros(n)
     NOx_OD = np.zeros(n)
-    T4 = np.linspace(3200, 3600, 3)
-    # T4 = [3600]
+    T3_SLS = np.zeros(n)
+    P3_SLS = np.zeros(n)
+    T4_SLS = np.zeros(n)
+    T3_CRZ = np.zeros(n)
+    P3_CRZ = np.zeros(n)
+    T4_CRZ = np.zeros(n)
+    H = np.zeros(n)
+    # T4 = np.linspace(3200, 3600, 2)
+    T4 = [3400, 3500, 3600]
 
     for T in T4:
         prob["RTO_T4"] = T
         for i, h in enumerate(hum):
+            print(f"### Running T4={T}, H={h} ###")
             prob["TOC.fc.WAR"] = h
             prob["humidity.H_OD"] = h
             prob.run_model()
             NOx_SLS[i] = prob.get_val("EINOx.EINOx_SLS")
             NOx_OD[i] = prob.get_val("EINOx.EINOx_OD")
+            T3_SLS[i] = prob.get_val("SLS.bld3.Fl_O:tot:T")
+            P3_SLS[i] = prob.get_val("SLS.bld3.Fl_O:tot:P")
+            T4_SLS[i] = prob.get_val("SLS.burner.Fl_O:tot:T")
+            T3_CRZ[i] = prob.get_val("CRZ.bld3.Fl_O:tot:T")
+            P3_CRZ[i] = prob.get_val("CRZ.bld3.Fl_O:tot:P")
+            T4_CRZ[i] = prob.get_val("CRZ.burner.Fl_O:tot:T")
+            H[i] = prob.get_val("EINOx.H")
 
-        with open(f"../OUTPUT/N3_trends/EINOx_T4-{int(T)}.pkl", "wb") as f:
-            pkl.dump(np.vstack((hum, NOx_SLS, NOx_OD)), f)
+        data_dict = {
+            "humidity": hum,
+            "NOx_SLS": NOx_SLS,
+            "NOx_CRZ": NOx_OD,
+            "T3_SLS": T3_SLS,
+            "P3_SLS": P3_SLS,
+            "T4_SLS": T4_SLS,
+            "T3_CRZ": T3_CRZ,
+            "P3_CRZ": P3_CRZ,
+            "T4_CRZ": T4_CRZ,
+            "H": H,
+        }
+
+        with open(f"../OUTPUT/N3_trends/EINOx_upd_T4-{int(T)}.pkl", "wb") as f:
+            pkl.dump(data_dict, f)
 
     # for pt in ["TOC"] + prob.model.od_pts:
     #     viewer(prob, pt)
@@ -799,13 +830,13 @@ if __name__ == "__main__":
     # print("Composition", prob["CRZ.burner.Fl_I:tot:composition"])
     # print("Composition", prob["CRZ.burner.Fl_O:*"])
 
-    inlet_prod_names = prob.model.TOC.inlet.real_flow.base_thermo.thermo.products
-    inlet_prod_concs = prob.model.TOC.inlet.real_flow.base_thermo.chem_eq._outputs["n"]
+    # inlet_prod_names = prob.model.TOC.inlet.real_flow.base_thermo.thermo.products
+    # inlet_prod_concs = prob.model.TOC.inlet.real_flow.base_thermo.chem_eq._outputs["n"]
 
-    for i in range(len(inlet_prod_names)):
-        if inlet_prod_names[i] == "H2O":
-            print(inlet_prod_names[i], inlet_prod_concs[i])
-        # if inject_prod_names[i] == "H2O":
-        #     print(inject_prod_names[i], inject_prod_concs[i])
+    # for i in range(len(inlet_prod_names)):
+    #     if inlet_prod_names[i] == "H2O":
+    #         print(inlet_prod_names[i], inlet_prod_concs[i])
+    # if inject_prod_names[i] == "H2O":
+    #     print(inject_prod_names[i], inject_prod_concs[i])
 
     print("time", time.time() - st)

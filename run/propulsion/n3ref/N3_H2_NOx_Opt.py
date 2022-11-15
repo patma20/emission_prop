@@ -12,7 +12,6 @@ import numpy as np
 import time
 import os
 import pickle
-from pprint import pprint
 
 # ==============================================================================
 # External Python modules
@@ -23,48 +22,48 @@ import pycycle.api as pyc
 # ==============================================================================
 # Extension modules
 # ==============================================================================
-from N3_NOx import N3, viewer, MPN3, map_plots
+from N3ref import N3, viewer, MPN3
 
 
 def N3_MDP_Opt_model(output_dir, save_res=False):
 
     prob = om.Problem()
-    prob.model = MPN3(order_add=["bal"])
+    prob.model = MPN3(use_h2=True)  # order_add=["bal"]
 
     prob.model.pyc_add_cycle_param("ext_ratio.core_Cv", 0.9999)
     prob.model.pyc_add_cycle_param("ext_ratio.byp_Cv", 0.9975)
     # prob.model.pyc_add_cycle_param("EINOx.H_SLS", 0.007)
 
-    bal = prob.model.add_subsystem("bal", om.BalanceComp(), promotes=["RTO_T4"])
+    # bal = prob.model.add_subsystem("bal", om.BalanceComp(), promotes=["RTO_T4"])
 
-    bal.add_balance("TOC_BPR", val=23.7281, units=None, eq_units=None)
-    prob.model.connect("bal.TOC_BPR", "TOC.splitter.BPR")
-    prob.model.connect("CRZ.ext_ratio.ER", "bal.lhs:TOC_BPR")
+    # bal.add_balance("TOC_BPR", val=23.7281, units=None, eq_units=None)
+    # prob.model.connect("bal.TOC_BPR", "TOC.splitter.BPR")
+    # prob.model.connect("CRZ.ext_ratio.ER", "bal.lhs:TOC_BPR")
 
-    bal.add_balance("TOC_W", val=820.95, units="lbm/s", eq_units="degR", rhs_name="RTO_T4")
-    prob.model.connect("bal.TOC_W", "TOC.fc.W")
-    prob.model.connect("RTO.burner.Fl_O:tot:T", "bal.lhs:TOC_W")
+    # bal.add_balance("TOC_W", val=820.95, units="lbm/s", eq_units="degR", rhs_name="RTO_T4")
+    # prob.model.connect("bal.TOC_W", "TOC.fc.W")
+    # prob.model.connect("RTO.burner.Fl_O:tot:T", "bal.lhs:TOC_W")
 
-    bal.add_balance(
-        "CRZ_Fn_target", val=5514.4, units="lbf", eq_units="lbf", use_mult=True, mult_val=0.9, ref0=5000.0, ref=7000.0
-    )
-    prob.model.connect("bal.CRZ_Fn_target", "CRZ.balance.rhs:FAR")
-    prob.model.connect("TOC.perf.Fn", "bal.lhs:CRZ_Fn_target")
-    prob.model.connect("CRZ.perf.Fn", "bal.rhs:CRZ_Fn_target")
+    # bal.add_balance(
+    #     "CRZ_Fn_target", val=5514.4, units="lbf", eq_units="lbf", use_mult=True, mult_val=0.9, ref0=5000.0, ref=7000.0
+    # )
+    # prob.model.connect("bal.CRZ_Fn_target", "CRZ.balance.rhs:FAR")
+    # prob.model.connect("TOC.perf.Fn", "bal.lhs:CRZ_Fn_target")
+    # prob.model.connect("CRZ.perf.Fn", "bal.rhs:CRZ_Fn_target")
 
-    bal.add_balance(
-        "SLS_Fn_target",
-        val=28620.8,
-        units="lbf",
-        eq_units="lbf",
-        use_mult=True,
-        mult_val=1.2553,
-        ref0=28000.0,
-        ref=30000.0,
-    )
-    prob.model.connect("bal.SLS_Fn_target", "SLS.balance.rhs:FAR")
-    prob.model.connect("RTO.perf.Fn", "bal.lhs:SLS_Fn_target")
-    prob.model.connect("SLS.perf.Fn", "bal.rhs:SLS_Fn_target")
+    # bal.add_balance(
+    #     "SLS_Fn_target",
+    #     val=28620.8,
+    #     units="lbf",
+    #     eq_units="lbf",
+    #     use_mult=True,
+    #     mult_val=1.2553,
+    #     ref0=28000.0,
+    #     ref=30000.0,
+    # )
+    # prob.model.connect("bal.SLS_Fn_target", "SLS.balance.rhs:FAR")
+    # prob.model.connect("RTO.perf.Fn", "bal.lhs:SLS_Fn_target")
+    # prob.model.connect("SLS.perf.Fn", "bal.rhs:SLS_Fn_target")
 
     # ==============================================================================
     # Optimizer setup
@@ -73,17 +72,14 @@ def N3_MDP_Opt_model(output_dir, save_res=False):
     prob.driver.options["optimizer"] = "SNOPT"
     prob.driver.options["debug_print"] = ["desvars", "nl_cons", "objs"]
 
-    # prob.driver.opt_settings["LU complete pivoting"] = None
-    # prob.driver.opt_settings["Hessian full memory"] = None
-    # prob.driver.opt_settings["Major feasibility tolerance"] = 1e-8
-    # prob.driver.opt_settings["Major optimality tolerance"] = 1e-8
-    # prob.driver.opt_settings["Penalty parameter"] = 1.0
-    # prob.driver.opt_settings["Major step limit"] = 0.1
+    prob.driver.opt_settings["LU complete pivoting"] = None
+    prob.driver.opt_settings["Hessian full memory"] = None
+    prob.driver.opt_settings["Major feasibility tolerance"] = 1e-8
+    prob.driver.opt_settings["Major optimality tolerance"] = 1e-8
+    prob.driver.opt_settings["Penalty parameter"] = 1.0
+    prob.driver.opt_settings["Major step limit"] = 0.1
 
     modelname = "H2"
-    # modelname = "P3T3T4"
-    # modelname = "P3T3curvefit"
-    # modelname = "P3T3Hum"
 
     if save_res is True:
         if os.path.isdir(output_dir) is False:
@@ -101,17 +97,18 @@ def N3_MDP_Opt_model(output_dir, save_res=False):
     # ==============================================================================
     # Design variables
     # ==============================================================================
-    prob.model.add_design_var("fan:PRdes", lower=1.2, upper=1.4)
-    prob.model.add_design_var("lpc:PRdes", lower=2.5, upper=4.0)
-    prob.model.add_design_var("TOC.balance.rhs:hpc_PR", lower=40.0, upper=70.0, ref0=40.0, ref=70.0)
+    # prob.model.add_design_var("fan:PRdes", lower=1.2, upper=1.3)
+    prob.model.add_design_var("lpc:PRdes", lower=2.5, upper=8.0)
+    # prob.model.add_design_var("TOC.balance.rhs:hpc_PR", lower=40.0, upper=70.0, ref0=40.0, ref=70.0)
     prob.model.add_design_var("RTO_T4", lower=3000.0, upper=3600.0, ref0=3000.0, ref=3600.0)
-    prob.model.add_design_var("bal.rhs:TOC_BPR", lower=1.35, upper=1.45, ref0=1.35, ref=1.45)
+    # prob.model.add_design_var("bal.rhs:TOC_BPR", lower=1.35, upper=1.45, ref0=1.35, ref=1.45)
+    # prob.model.add_design_var("TOC.splitter.BPR", lower=20, upper=30, ref0=20, ref=30)
     prob.model.add_design_var("T4_ratio.TR", lower=0.5, upper=0.95, ref0=0.5, ref=0.95)
 
     # ==============================================================================
     # Constraints
     # ==============================================================================
-    prob.model.add_constraint("TOC.fan_dia.FanDia", upper=100.0, ref=100.0)
+    # prob.model.add_constraint("TOC.fan_dia.FanDia", upper=100.0, ref=100.0)
     prob.model.add_constraint("TOC.perf.Fn", lower=5800.0, ref=6000.0)
     # prob.model.add_constraint("TOC.NOx.EINOx", upper=18.0, ref=18.0)
 
@@ -133,31 +130,32 @@ if __name__ == "__main__":
     prob.setup()
 
     # Define the design point
-    prob.set_val("TOC.splitter.BPR", 23.7281)
-    prob.set_val("TOC.balance.rhs:hpc_PR", 55.0)
+    prob.set_val("TOC.fc.W", 820.44097898, units="lbm/s")
+    prob.set_val("TOC.splitter.BPR", 23.94514401)
+    prob.set_val("TOC.balance.rhs:hpc_PR", 53.6332)
 
     # Set specific cycle parameters
     prob.set_val("SLS.fc.MN", 0.001)
-    prob.set_val("SLS.balance.rhs:FAR", 28620.9, units="lbf")
-    prob.set_val("CRZ.balance.rhs:FAR", 5466.5, units="lbf")
-    prob.set_val("bal.rhs:TOC_BPR", 1.40)
-    # prob.set_val("T4_ratio.TR", 0.95)
+    prob.set_val("SLS.balance.rhs:FAR", 28620.84, units="lbf")
+    prob.set_val("CRZ.balance.rhs:FAR", 5510.72833567, units="lbf")
+    # prob.set_val("bal.rhs:TOC_BPR", 1.40)
     prob.set_val("T4_ratio.TR", 0.926470588)
+    prob.set_val("RTO_T4", 3400.0, units="degR")
     prob.set_val("fan:PRdes", 1.300)
     prob.set_val("lpc:PRdes", 3.000)
     prob.set_val("RTO.hpt_cooling.x_factor", 0.9)
 
     # Set inital guesses for balances
     prob["TOC.balance.FAR"] = 0.02650
-    prob["bal.TOC_W"] = 820.95
+    # prob["bal.TOC_W"] = 820.44097898
     prob["TOC.balance.lpt_PR"] = 10.937
     prob["TOC.balance.hpt_PR"] = 4.185
     prob["TOC.fc.balance.Pt"] = 5.272
     prob["TOC.fc.balance.Tt"] = 444.41
 
     FAR_guess = [0.02832, 0.02541, 0.02510]
-    W_guess = [1916.13, 2000, 802.79]
-    BPR_guess = [25.5620, 27.3467, 24.3233]
+    W_guess = [1916.13, 1900.0, 802.79]
+    BPR_guess = [25.5620, 22.3467, 24.3233]
     fan_Nmech_guess = [2132.6, 1953.1, 2118.7]
     lp_Nmech_guess = [6611.2, 6054.5, 6567.9]
     hp_Nmech_guess = [22288.2, 21594.0, 20574.1]
@@ -229,10 +227,10 @@ if __name__ == "__main__":
     # Create compressor and turbine maps
     # map_plots(prob, "TOC")
 
-    print("Diameter", prob["TOC.fan_dia.FanDia"][0])
-    print("ER", prob["CRZ.ext_ratio.ER"])
-    print("EINOx", prob["CRZ.NOx.EINOx"])
-    print("Composition", prob["CRZ.burner.Fl_O:tot:composition"])
-    print("Composition", prob["CRZ.burner.Fl_I:tot:composition"])
+    # print("Diameter", prob["TOC.fan_dia.FanDia"][0])
+    # print("ER", prob["CRZ.ext_ratio.ER"])
+    # print("EINOx", prob["CRZ.NOx.EINOx"])
+    # print("Composition", prob["CRZ.burner.Fl_O:tot:composition"])
+    # print("Composition", prob["CRZ.burner.Fl_I:tot:composition"])
 
     print("time", time.time() - st)

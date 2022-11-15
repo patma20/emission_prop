@@ -8,7 +8,7 @@ import openmdao.api as om
 import pycycle.api as pyc
 import pycycle.constants as con
 
-from components.emissions import NOxT4, NOxFit, NOxHum
+from components.emissions import NOxT4, NOxHum
 from components.injector import Injector
 
 from small_core_eff_balance import SmallCoreEffBalance
@@ -24,7 +24,7 @@ class N3(pyc.Cycle):
     def initialize(self):
         self.options.declare("cooling", default=False, desc="If True, calculate cooling flow values.")
         self.options.declare("use_h2", default=False, types=bool, desc="If True, use hydrogen as the fuel.")
-        self.options.declare("inject", default=False, types=bool, desc="If True, use water injection.")
+        # self.options.declare("inject", default=False, types=bool, desc="If True, use water injection.")
         self.options.declare("wet_air", default=False, types=bool, desc="If True, use wet air.")
 
         super().initialize()
@@ -44,15 +44,15 @@ class N3(pyc.Cycle):
         else:
             self.options["thermo_method"] = "CEA"
 
-            # if self.options["wet_air"] is True:
-            self.options["thermo_data"] = pyc.species_data.wet_air
-            # else:
-            #     self.options["thermo_data"] = pyc.species_data.janaf
+            if self.options["wet_air"]:
+                self.options["thermo_data"] = pyc.species_data.wet_air
+            else:
+                self.options["thermo_data"] = pyc.species_data.janaf
 
-            # if self.options["use_h2"]:
-            #     FUEL_TYPE = "H2"
-            # else:
-            FUEL_TYPE = "Jet-A(g)"
+            if self.options["use_h2"]:
+                FUEL_TYPE = "H2"
+            else:
+                FUEL_TYPE = "Jet-A(g)"
 
         cooling = self.options["cooling"]
         design = self.options["design"]
@@ -472,17 +472,17 @@ class MPN3(pyc.MPCycle):
         self.options.declare("order_start", default=[], desc="Name of subsystems to add to beginning of order.")
         self.options.declare("statics", default=True, desc="Tells the model whether or not to connect areas.")
         self.options.declare("use_h2", default=False, desc="If True, tells the model to use hydrogen fuel.")
-        self.options.declare("inject", default=False, desc="If True, use water injection.")
         self.options.declare("wet_air", default=False, desc="If True, use wet air.")
 
         super().initialize()
 
     def setup(self):
+        wet_air = self.options["wet_air"]
 
         # TOC POINT (DESIGN)
         self.pyc_add_pnt(
             "TOC",
-            N3(inject=True),
+            N3(wet_air=wet_air),
             promotes_inputs=[
                 ("fan.PR", "fan:PRdes"),
                 ("lpc.PR", "lpc:PRdes"),
@@ -565,7 +565,7 @@ class MPN3(pyc.MPCycle):
         self.od_recoveries = [0.9970, 0.9950, 0.9980]
 
         for i, pt in enumerate(self.od_pts):
-            self.pyc_add_pnt(pt, N3(design=False, cooling=self.cooling[i]))
+            self.pyc_add_pnt(pt, N3(design=False, wet_air=wet_air, cooling=self.cooling[i]))
 
             self.set_input_defaults(pt + ".fc.MN", val=self.od_MNs[i])
             self.set_input_defaults(pt + ".fc.alt", val=self.od_alts[i], units="ft")
@@ -670,7 +670,7 @@ def N3ref_model():
 
     prob = om.Problem()
 
-    prob.model = MPN3(inject=True, wet_air=True)
+    prob.model = MPN3(wet_air=True)
 
     # setup the optimization
     prob.driver = om.ScipyOptimizeDriver()
@@ -764,30 +764,30 @@ if __name__ == "__main__":
 
     prob.set_solver_print(level=-1)
     prob.set_solver_print(level=2, depth=1)
-    # prob.run_model()
+    prob.run_model()
 
-    n = 4
-    w_inject = np.linspace(0.000001, 0.11, n)
+    # n = 4
+    # w_inject = np.linspace(0.000001, 0.11, n)
     # w_inject = np.linspace(0.000001, 0.04, n)
     # w_inject = [0.13]
-    TSFC_CRZ = np.zeros(n)
-    TSFC_TOC = np.zeros(n)
+    # TSFC_CRZ = np.zeros(n)
+    # TSFC_TOC = np.zeros(n)
     # T4 = np.linspace(3200, 3600, 3)
     # T4 = [3500.0]
-    T4 = [3500.0]
+    # T4 = [3500.0]
 
-    for T in T4:
-        prob["RTO_T4"] = T
-        for i, w in enumerate(w_inject):
-            prob["TOC.inject.mix:W"] = w
-            prob.run_model()
-            TSFC_CRZ[i] = prob.get_val("CRZ.perf.TSFC")
-            TSFC_TOC[i] = prob.get_val("TOC.perf.TSFC")
+    # for T in T4:
+    #     prob["RTO_T4"] = T
+    #     for i, w in enumerate(w_inject):
+    #         prob["TOC.inject.mix:W"] = w
+    #         prob.run_model()
+    #         TSFC_CRZ[i] = prob.get_val("CRZ.perf.TSFC")
+    #         TSFC_TOC[i] = prob.get_val("TOC.perf.TSFC")
 
-        with open(f"../OUTPUT/N3_trends/w_inject-{T}.pkl", "wb") as f:
-            pkl.dump(np.vstack((w_inject, TSFC_CRZ, TSFC_TOC)), f)
+    #     with open(f"../OUTPUT/N3_trends/w_inject-{T}.pkl", "wb") as f:
+    #         pkl.dump(np.vstack((w_inject, TSFC_CRZ, TSFC_TOC)), f)
 
-        np.save(f"../OUTPUT/N3_trends/w_inject-{T}", np.vstack((w_inject, TSFC_CRZ, TSFC_TOC)))
+    #     np.save(f"../OUTPUT/N3_trends/w_inject-{T}", np.vstack((w_inject, TSFC_CRZ, TSFC_TOC)))
 
     # for pt in ["TOC"] + prob.model.od_pts:
     #     viewer(prob, pt)
@@ -802,10 +802,21 @@ if __name__ == "__main__":
     inlet_prod_names = prob.model.TOC.inlet.real_flow.base_thermo.thermo.products
     inlet_prod_concs = prob.model.TOC.inlet.real_flow.base_thermo.chem_eq._outputs["n"]
 
+    inject_prod_names = prob.model.TOC.inject.vitiated_flow.base_thermo.thermo.products
+    inject_prod_concs = prob.model.TOC.inject.vitiated_flow.base_thermo.chem_eq._outputs["n"]
+
+    print(inlet_prod_names)
+    print(inlet_prod_concs)
+
+    print(inject_prod_names)
+    print(inject_prod_concs)
+
+    print(100 * "#")
+
     for i in range(len(inlet_prod_names)):
         if inlet_prod_names[i] == "H2O":
             print(inlet_prod_names[i], inlet_prod_concs[i])
-        # if inject_prod_names[i] == "H2O":
-        #     print(inject_prod_names[i], inject_prod_concs[i])
+        if inject_prod_names[i] == "H2O":
+            print(inject_prod_names[i], inject_prod_concs[i])
 
     print("time", time.time() - st)
