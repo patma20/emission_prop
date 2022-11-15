@@ -140,34 +140,45 @@ if __name__ == "__main__":
     # print("Diameter", prob["TOC.fan_dia.FanDia"][0])
     # print("ER", prob["CRZ.ext_ratio.ER"])
     # print("EINOx", prob["CRZ.NOx.EINOx"])
-    # print("Composition", prob["inlet.Fl_I:tot:composition"])
-    # print("Composition", prob["inlet.Fl_I:tot:T"])
+    # print("Inlet Composition", prob["DESIGN.inlet.Fl_I:tot:composition"])
+    # print(sum(prob["DESIGN.inlet.Fl_I:tot:composition"]))
+    print("Nozzle Composition", prob["DESIGN.nozz.Fl_I:tot:composition"])
+    # print(sum(prob["DESIGN.nozz.Fl_I:tot:composition"]))
 
-    # print("prods", prob.model.duct.Fl_O_data["Fl_O"])  # Fl_I_data.inflow_composition
-    # print("prods", prob.model.duct.Fl_O_data)  # Fl_I_data.inflow_composition
+    # print("prods inlet", prob.model.DESIGN.inlet.Fl_I_data["Fl_I"])  # Fl_I_data.inflow_composition
+    # print("prods nozzle", prob.model.DESIGN.nozz.Fl_O_data["Fl_O"])  # Fl_I_data.inflow_composition
     # print("prods", vars(prob.model.duct.real_flow.base_thermo.thermo))  # Fl_I_data.inflow_composition
 
-    inlet_prod_names = prob.model.DESIGN.inlet.real_flow.base_thermo.thermo.products
-    inlet_prod_concs = prob.model.DESIGN.inlet.real_flow.base_thermo.chem_eq._outputs["n"]
+    # print(prob.model.DESIGN.inject.mix_react.mix_composition)  # .thermo_add_comp.inflow_composition
+    # inlet_prod_names = prob.model.DESIGN.inlet.real_flow.base_thermo.thermo.products
+    # inlet_prod_concs = prob.model.DESIGN.inlet.real_flow.base_thermo.chem_eq._outputs["n"]
 
     inject_prod_names = prob.model.DESIGN.inject.vitiated_flow.base_thermo.thermo.products
     inject_prod_concs = prob.model.DESIGN.inject.vitiated_flow.base_thermo.chem_eq._outputs["n"]
 
-    for i in range(len(inlet_prod_names)):
-        if inlet_prod_names[i] == "H2O":
-            print(inlet_prod_names[i], inlet_prod_concs[i])
-        if inject_prod_names[i] == "H2O":
-            print(inject_prod_names[i], inject_prod_concs[i])
-        # if prod_names[i] == "N2":
-        #     n2 = prod_concs[i]
-        # if prod_names[i] == "O2":
-        #     o2 = prod_concs[i]
+    # for i in range(len(inlet_prod_names)):
+    #     if inlet_prod_names[i] == "H2O":
+    #         print(inlet_prod_names[i], inlet_prod_concs[i])
+    #     if inject_prod_names[i] == "H2O":
+    #         print(inject_prod_names[i], inject_prod_concs[i])
+    # if prod_names[i] == "N2":
+    #     n2 = prod_concs[i]
+    # if prod_names[i] == "O2":
+    #     o2 = prod_concs[i]
 
     # print(n2 / o2)
     # print("sum", np.sum(prod_concs))
 
-    # print("prods", prod_names)  # Fl_I_data.inflow_composition
-    # print("prod comps", prod_concs)  # Fl_I_data.inflow_composition
+    for n, e in zip(inlet_prod_names, inlet_prod_concs):
+        print(n, e)
+
+    # print("prods", inlet_prod_names)  # Fl_I_data.inflow_composition
+    # print("prod comps", inlet_prod_concs)  # Fl_I_data.inflow_composition
+    # print("prod sum", sum(inlet_prod_concs))
+
+    # print("prods", inject_prod_names)  # Fl_I_data.inflow_composition
+    # print("prod comps", inject_prod_concs)  # Fl_I_data.inflow_composition
+    # print("prod sum", sum(inject_prod_concs))
     # print("prods", prob.model.duct.real_flow.base_thermo.thermo.prod_data)  # Fl_I_data.inflow_composition
     # print("prods", prob.model.duct.products)  # Fl_I_data.inflow_composition
     # print("Composition", prob["duct.Fl_O:tot:composition"])

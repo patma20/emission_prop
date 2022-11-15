@@ -66,7 +66,7 @@ class HistoryPlotter:
 
         # Looop over all the objects we need for plotting
         for ax, key, color in zip(axes, opt_vars.keys(), colors):
-            if key in ["optimality", "feasibility"]:
+            if key in ["feasibility", "optimality"]:
                 # Log-y plot of feas and opt
                 ax.semilogy(np.arange(0, len(opt_vars[key]), 1), opt_vars[key], label=key, color=color, **kwargs)
 
@@ -92,7 +92,7 @@ class HistoryPlotter:
         # Set the x-label on the last subplot
         axes[-1].set_xlabel("Iterations")
 
-        # If an outptu dir is given, save the plot.
+        # If an output dir is given, save the plot.
         # Else, return the fig and axes
         if self.output_dir is None:
             return fig, axes
@@ -237,9 +237,9 @@ class HistoryPlotter:
 
 
 if __name__ == "__main__":
-    hist_path = "../OUTPUT/HX_opt_50kW/history_HX_50kW.out"
+    hist_path = "../OUTPUT/N3_opt/history_P3T3T4.out"
     # hist_path = "../OUTPUT/N3_opt_1kgs_50kW_full/history_50_BPR300.out"
-    out_path = "../../../postprocessing/HX_opt_50/"
+    out_path = "../../../postprocessing/P3T3T4/"
     # out_path = "../../../postprocessing/N3_opt_50/"
     if os.path.isdir(out_path) is False:
         os.mkdir(out_path)
