@@ -279,10 +279,10 @@ if __name__ == "__main__":
     # print(n2 / o2)
     # print("sum", np.sum(prod_concs))
 
-    # print(prob.model.DESIGN.inlet.Fl_I_data["Fl_I"])
-    # print(prob.model.DESIGN.inject.Fl_I_data["Fl_I"])
-    # print(prob.model.DESIGN.inject.Fl_O_data["Fl_O"])
-    # print(prob.model.DESIGN.nozz.Fl_I_data["Fl_I"])
+    print(prob.model.DESIGN.inlet.Fl_I_data["Fl_I"])
+    print(prob.model.DESIGN.inject.Fl_I_data["Fl_I"])
+    print(prob.model.DESIGN.inject.Fl_O_data["Fl_O"])
+    print(prob.model.DESIGN.nozz.Fl_I_data["Fl_I"])
 
     # inlet_prod_names = prob.model.DESIGN.inlet.real_flow.base_thermo.thermo.products
     # inlet_prod_concs = prob.model.DESIGN.inlet.real_flow.base_thermo.chem_eq._outputs["n"]

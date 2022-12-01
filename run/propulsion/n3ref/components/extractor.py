@@ -39,9 +39,7 @@ class ThermoSub(om.ExplicitComponent):
         # inputs
         self.add_input("Fl_I:stat:W", val=0.0, desc="weight flow", units="lbm/s")
         self.add_input("Fl_I:tot:composition", val=inflow_thermo.b0, desc="incoming flow composition")
-        # self.add_input("n_water", val=1e-4, desc="molar concetration of H2O of incoming flow")
-        self.add_input("n", val=np.ones(17), shape=17, desc="molar concetration of H2O of incoming flow")
-        # self.add_input("idx", val=0, desc="index of H2O of incoming flow")
+        self.add_input("n", val=np.ones(17), shape=17, desc="molar concetration of incoming flow")
         self.add_input("w_frac", val=0.1, desc="fraction of water from incoming flow to extract")
 
         # outputs
@@ -56,8 +54,8 @@ class ThermoSub(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
 
-        W = inputs["Fl_I:stat:W"]
-        n = inputs["n"]
+        W = inputs["Fl_I:stat:W"]  # incoming flow rate
+        n = inputs["n"]  # moles of products of imcoming flow
         idx = self.products.index("H2O")
         n_h2o = n[idx]
         w_frac = inputs["w_frac"]
@@ -70,13 +68,13 @@ class ThermoSub(om.ExplicitComponent):
         sub_comp = 0 * b0_out
         sub_comp[Fl_I_names.index("H")] = 2 * n_h2o
         sub_comp[Fl_I_names.index("O")] = n_h2o
-        sub_comp *= w_frac  # only subtract a fraction of water elements
 
         sub_comp *= self.inflow_wt_mole
         b0_out *= self.inflow_wt_mole  # convert to mass units
         sub_comp /= np.sum(b0_out)
         b0_out /= np.sum(b0_out)  # scale to 1 kg
         sub_comp *= W  # scale to total mass flow
+        sub_comp *= w_frac  # only subtract a fraction of water elements
         b0_out *= W  # scale to full mass flow
 
         b0_out -= sub_comp  # subtract water element concentration
@@ -89,26 +87,22 @@ class ThermoSub(om.ExplicitComponent):
         outputs["W_water"] = w_water
 
 
-# class ExtractCalcs(om.ExplicitComponent):
-
-
 class WaterBleed(Element):
     """
-    bleed extration from the incoming flow
+    extract water from the incoming flow
     --------------
     Flow Stations
     --------------
     Fl_I -> primary input flow
     Fl_O -> primary output flow
-    Fl_{bleed_name} -> bleed output flows
-        one for each name in `bleed_names` option
+
     -------------
     Design
     -------------
         inputs
         --------
-        {bleed_name}:frac_W
-            fraction of incoming flow to bleed off to FL_{bleed_name}
+        w_frac
+            fraction of water in incoming flow to extract
         MN
     -------------
     Off-Design
@@ -120,7 +114,6 @@ class WaterBleed(Element):
 
     def initialize(self):
         self.options.declare("statics", default=True, desc="If True, calculate static properties.")
-        # self.options.declare("bleed_names", types=(list, tuple), desc="list of names for the bleed ports", default=[])
 
         self.default_des_od_conns = [
             # (design src, off-design target)
@@ -130,15 +123,16 @@ class WaterBleed(Element):
         super().initialize()
 
     def pyc_setup_output_ports(self):
-        self.copy_flow("Fl_I", "Fl_O")
+        self.copy_flow(
+            "Fl_I", "Fl_O"
+        )  # since we are extracting only a fraction of water, copy flow element composition dictionary
 
     def setup(self):
-
-        thermo_method = self.options["thermo_method"]
-        thermo_data = self.options["thermo_data"]
+        thermo_method = self.options["thermo_method"]  # will always be CEA for this component
+        thermo_data = self.options["thermo_data"]  #
         statics = self.options["statics"]
         design = self.options["design"]
-        composition = self.Fl_O_data["Fl_O"]
+        composition = self.Fl_O_data["Fl_O"]  # dictionary of elements strings and associated elemental ratio
 
         # Compute equilibrium composition before extraction to get moles of H2O in flow
         init_flow = Thermo(
@@ -154,28 +148,21 @@ class WaterBleed(Element):
         flow_in = FlowIn(fl_name="Fl_I")
         self.add_subsystem("flow_in", flow_in, promotes=["Fl_I:tot:*", "Fl_I:stat:*"])
 
-        thermo_data = self.options["thermo_data"]
+        # Create object to subtract water from flow
         thermo_sub_comp = ThermoSub(spec=thermo_data, inflow_composition=self.Fl_I_data["Fl_I"])
 
         # Create output_ports instance
         self.ext_sys = self.add_subsystem(
             "sub_flow",
             thermo_sub_comp,
-            promotes=[
-                "Fl_I:stat:W",
-                "Fl_I:tot:composition",
-                # "n_water",
-                "Wout",
-                "W_water",
-                "composition_out",
-            ],
+            promotes=["Fl_I:stat:W", "Fl_I:tot:composition", "Wout", "W_water", "composition_out"],
         )
 
         # Pressure loss
         prom_in = [("Pt_in", "Fl_I:tot:P"), "dPqP"]
         self.add_subsystem("p_loss", PressureLoss(), promotes_inputs=prom_in, promotes_outputs=["Pt_out"])
 
-        # Total Calc of equilibrium flow with updated composition
+        # Calculate total properties of equilibrium flow with updated composition
         updated_flow = Thermo(
             mode="total_TP",
             fl_name="Fl_O:tot",
@@ -184,15 +171,10 @@ class WaterBleed(Element):
         )
         prom_in = [("composition", "composition_out"), ("T", "Fl_I:tot:T"), ("P", "Pt_out")]
         self.add_subsystem("updated_flow", updated_flow, promotes_inputs=prom_in, promotes_outputs=["Fl_O:*"])
-        # self.add_subsystem("updated_flow", updated_flow, promotes_outputs=["Fl_O:*"])
-        # self.connect("composition_out", "updated_flow.composition")
-        # self.connect("Fl_I:tot:T", "updated_flow.T")
-        # self.connect("p_loss.Pt_out", "updated_flow.P")
 
         if statics:
             if design:
                 # Calculate static properties.
-
                 out_stat = Thermo(
                     mode="static_MN",
                     fl_name="Fl_O:stat",

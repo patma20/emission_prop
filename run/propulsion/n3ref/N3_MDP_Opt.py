@@ -2,7 +2,6 @@ import numpy as np
 import time
 import pickle
 import os
-from pprint import pprint
 
 import openmdao.api as om
 import pycycle.api as pyc

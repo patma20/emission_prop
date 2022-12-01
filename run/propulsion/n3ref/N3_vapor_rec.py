@@ -1,16 +1,34 @@
+#!/usr/bin/env python
+"""
+@File    :   N3_vapor_rec.py
+@Time    :   2022/11/22
+@Desc    :   None
+"""
+
+# ==============================================================================
+# Standard Python modules
+# ==============================================================================
 import sys
 import os
+
+# ==============================================================================
+# External Python modules
+# ==============================================================================
+import openmdao.api as om
+import pycycle.api as pyc
 import pickle as pkl
 import numpy as np
 
-import openmdao.api as om
+# from mpi4py import MPI
 
-import pycycle.api as pyc
-import pycycle.constants as con
-from mpi4py import MPI
+# ==============================================================================
+# Extension modules
+# ==============================================================================
+# import pycycle.constants as con
 
 from components.emissions import EINOx
 from components.injector import Injector
+from components.extractor import WaterBleed
 
 from small_core_eff_balance import SmallCoreEffBalance
 
@@ -25,7 +43,6 @@ class N3(pyc.Cycle):
     def initialize(self):
         self.options.declare("cooling", default=False, desc="If True, calculate cooling flow values.")
         self.options.declare("use_h2", default=False, types=bool, desc="If True, use hydrogen as the fuel.")
-        # self.options.declare("inject", default=False, types=bool, desc="If True, use water injection.")
         self.options.declare("wet_air", default=False, types=bool, desc="If True, use wet air.")
 
         super().initialize()
@@ -102,6 +119,7 @@ class N3(pyc.Cycle):
         self.add_subsystem("perf", pyc.Performance(num_nozzles=2, num_burners=1))
 
         inject = self.add_subsystem("inject", Injector(reactant="Water", mix_name="mix"))
+        extract = self.add_subsystem("extract", WaterBleed())
 
         # Thermodynamic connections
         self.connect("inlet.Fl_O:tot:P", "perf.Pt2")
@@ -154,6 +172,7 @@ class N3(pyc.Cycle):
             "duct45",
             "lpt",
             "duct5",
+            "extract",
             "core_nozz",
             "byp_bld",
             "duct17",
@@ -220,6 +239,7 @@ class N3(pyc.Cycle):
             self.connect("duct25.Fl_O:stat:W", "hpc_CS.Win")
             self.connect("hpc.Fl_O:tot:T", "hpc_CS.Tout")
             self.connect("hpc.Fl_O:tot:P", "hpc_CS.Pout")
+
             self.add_subsystem("hpc_EtaBalance", SmallCoreEffBalance(eng_type="large", tech_level=0))
             self.connect("hpc_CS.CS", "hpc_EtaBalance.CS")
             self.connect("hpc.eff_poly", "hpc_EtaBalance.eta_p")
@@ -316,10 +336,12 @@ class N3(pyc.Cycle):
 
         self.set_order(main_order + order_add + ["balance"])
 
+        # --- Inlet Flow ---
         self.pyc_connect_flow("fc.Fl_O", "inlet.Fl_I")
         self.pyc_connect_flow("inlet.Fl_O", "fan.Fl_I")
         self.pyc_connect_flow("fan.Fl_O", "splitter.Fl_I")
         self.pyc_connect_flow("splitter.Fl_O1", "duct2.Fl_I")
+        # ---  Core Flow ---
         self.pyc_connect_flow("duct2.Fl_O", "lpc.Fl_I")
         self.pyc_connect_flow("lpc.Fl_O", "bld25.Fl_I")
         self.pyc_connect_flow("bld25.Fl_O", "duct25.Fl_I")
@@ -330,8 +352,19 @@ class N3(pyc.Cycle):
         self.pyc_connect_flow("burner.Fl_O", "hpt.Fl_I")
         self.pyc_connect_flow("hpt.Fl_O", "duct45.Fl_I")
         self.pyc_connect_flow("duct45.Fl_O", "lpt.Fl_I")
+
+        # self.pyc_connect_flow("lpt.Fl_O", "extract.Fl_I")
+        # self.pyc_connect_flow("extract.Fl_O", "duct5.Fl_I")
+        # self.pyc_connect_flow("duct5.Fl_O", "core_nozz.Fl_I")
+
         self.pyc_connect_flow("lpt.Fl_O", "duct5.Fl_I")
-        self.pyc_connect_flow("duct5.Fl_O", "core_nozz.Fl_I")
+        self.pyc_connect_flow("duct5.Fl_O", "extract.Fl_I")
+        self.pyc_connect_flow("extract.Fl_O", "core_nozz.Fl_I")
+
+        # self.pyc_connect_flow("lpt.Fl_O", "duct5.Fl_I")
+        # self.pyc_connect_flow("duct5.Fl_O", "core_nozz.Fl_I")
+
+        # --- Bypass Flow ---
         self.pyc_connect_flow("splitter.Fl_O2", "byp_bld.Fl_I")
         self.pyc_connect_flow("byp_bld.Fl_O", "duct17.Fl_I")
         self.pyc_connect_flow("duct17.Fl_O", "byp_nozz.Fl_I")
@@ -376,6 +409,7 @@ def viewer(prob, pt, file=sys.stdout):
         prob[pt + ".perf.OPR"],
         prob[pt + ".perf.TSFC"],
         prob[pt + ".splitter.BPR"],
+        prob[pt + ".extract.sub_flow.W_water"],
         prob[pt + ".inject.mix:W"],
     )
 
@@ -387,9 +421,13 @@ def viewer(prob, pt, file=sys.stdout):
     print("----------------------------------------------------------------------------", file=file, flush=True)
     print("                       PERFORMANCE CHARACTERISTICS", file=file, flush=True)
     print(
-        "    Mach      Alt       W      Fn      Fg    Fram     OPR     TSFC      BPR     Winj ", file=file, flush=True
+        "    Mach      Alt       W      Fn      Fg    Fram     OPR     TSFC      BPR      Wext      Winj ",
+        file=file,
+        flush=True,
     )
-    print(" %7.5f  %7.1f %7.3f %7.1f %7.1f %7.1f %7.3f  %7.5f  %7.3f  %7.5f" % summary_data, file=file, flush=True)
+    print(
+        " %7.5f  %7.1f %7.3f %7.1f %7.1f %7.1f %7.3f  %7.5f  %7.3f  %7.5f  %7.5f" % summary_data, file=file, flush=True
+    )
 
     fs_names = [
         "fc.Fl_O",
@@ -407,6 +445,7 @@ def viewer(prob, pt, file=sys.stdout):
         "hpt.Fl_O",
         "duct45.Fl_O",
         "lpt.Fl_O",
+        "extract.Fl_O",
         "duct5.Fl_O",
         "core_nozz.Fl_O",
         "splitter.Fl_O2",
@@ -506,7 +545,8 @@ class MPN3(pyc.MPCycle):
         self.set_input_defaults("TOC.duct17.MN", 0.45),
         self.set_input_defaults("TOC.fc.WAR", alt_war),
         self.set_input_defaults("TOC.inject.MN", 0.45),
-        self.set_input_defaults("TOC.inject.mix:W", 0.00001, units="lbm/s"),
+        self.set_input_defaults("TOC.extract.MN", 0.25),
+        self.set_input_defaults("TOC.extract.sub_flow.w_frac", 0.0001),
 
         self.pyc_add_cycle_param("burner.dPqP", 0.0400),
         self.pyc_add_cycle_param("core_nozz.Cv", 0.9999),
@@ -528,9 +568,8 @@ class MPN3(pyc.MPCycle):
         self.pyc_add_cycle_param("lpt.bld_inlet:frac_P", 1.0),
         self.pyc_add_cycle_param("lpt.bld_exit:frac_P", 0.0),
         self.pyc_add_cycle_param("byp_bld.bypBld:frac_W", 0.0),
-        self.pyc_add_cycle_param("inject.dPqP", 0.01)
-        # self.pyc_add_cycle_param("inject.mix:W", 0.00001, units="lbm/s")
-        # self.pyc_add_cycle_param("inject.mix:h", 180, units="Btu/lbm")
+        self.pyc_add_cycle_param("inject.dPqP", 0.01),
+        self.pyc_add_cycle_param("extract.dPqP", 0.001),
 
         # OTHER POINTS (OFF-DESIGN)
         self.od_pts = ["RTO", "SLS", "CRZ"]
@@ -541,7 +580,7 @@ class MPN3(pyc.MPCycle):
         self.od_BPRs = [1.75, 1.75, 1.9397]
         self.od_recoveries = [0.9970, 0.9950, 0.9980]
         self.war = [sls_war, sls_war, alt_war]
-        self.w_inject = [0.00001, 0.00001, 0.00001]
+        self.w_frac = [0.0001, 0.0001, 0.0001]
 
         for i, pt in enumerate(self.od_pts):
             self.pyc_add_pnt(pt, N3(design=False, use_h2=use_h2, wet_air=wet_air, cooling=self.cooling[i]))
@@ -552,7 +591,7 @@ class MPN3(pyc.MPCycle):
             self.set_input_defaults(pt + ".balance.rhs:BPR", val=self.od_BPRs[i])
             self.set_input_defaults(pt + ".inlet.ram_recovery", val=self.od_recoveries[i])
             self.set_input_defaults(pt + ".fc.WAR", val=self.war[i])
-            self.set_input_defaults(pt + ".inject.mix:W", val=self.w_inject[i])
+            self.set_input_defaults(pt + ".extract.sub_flow.w_frac", self.w_frac[i]),
 
         # Extra set input for Rolling Takeoff
         self.set_input_defaults("RTO.balance.rhs:FAR", 22800.0, units="lbf"),
@@ -599,6 +638,7 @@ class MPN3(pyc.MPCycle):
             self.pyc_connect_des_od("duct5.Fl_O:stat:area", "duct5.area")
             self.pyc_connect_des_od("byp_bld.Fl_O:stat:area", "byp_bld.area")
             self.pyc_connect_des_od("duct17.Fl_O:stat:area", "duct17.area")
+            self.pyc_connect_des_od("extract.Fl_O:stat:area", "extract.area")
             self.pyc_connect_des_od("inject.Fl_O:stat:area", "inject.area")
 
         self.pyc_connect_des_od("duct2.s_dPqP", "duct2.s_dPqP")
@@ -663,6 +703,11 @@ class MPN3(pyc.MPCycle):
         self.connect("H_CRZ", "CRZ_EINOx.h_OD")
         self.connect("H_SLS", ("TOC_EINOx.h_SLS", "RTO_EINOx.h_SLS", "CRZ_EINOx.h_SLS"))
 
+        self.connect("TOC.extract.W_water", "TOC.inject.mix:W")
+        self.connect("RTO.extract.W_water", "RTO.inject.mix:W")
+        self.connect("SLS.extract.W_water", "SLS.inject.mix:W")
+        self.connect("CRZ.extract.W_water", "CRZ.inject.mix:W")
+
         initial_order = ["T4_ratio", "TOC", "RTO", "SLS", "CRZ", "humidity", "TOC_EINOx", "RTO_EINOx", "CRZ_EINOx"]
         self.set_order(self.options["order_start"] + initial_order + self.options["order_add"])
 
@@ -678,6 +723,17 @@ class MPN3(pyc.MPCycle):
         newton.linesearch = om.BoundsEnforceLS()
         newton.linesearch.options["bound_enforcement"] = "scalar"
         newton.linesearch.options["iprint"] = -1
+
+        # nonlinear = self.nonlinear_solver = om.NonlinearBlockGS()
+        # nonlinear.options["atol"] = 1e-6
+        # nonlinear.options["rtol"] = 1e-99
+        # nonlinear.options["iprint"] = 2
+        # nonlinear.options["maxiter"] = 15
+
+        # self.connect("TOC.extract.W_water", "TOC.inject.mix:W")
+        # self.connect("RTO.extract.W_water", "RTO.inject.mix:W")
+        # self.connect("SLS.extract.W_water", "SLS.inject.mix:W")
+        # self.connect("CRZ.extract.W_water", "CRZ.inject.mix:W")
 
         self.linear_solver = om.DirectSolver(assemble_jac=True)
 
@@ -731,7 +787,8 @@ if __name__ == "__main__":
     # Define the design point
     prob.set_val("TOC.fc.W", 820.44097898, units="lbm/s")
     prob.set_val("TOC.splitter.BPR", 23.94514401),
-    prob.set_val("TOC.balance.rhs:hpc_PR", 53.6332)  # 60.0
+    prob.set_val("TOC.balance.rhs:hpc_PR", 53.6332)  # for JetA
+    # prob.set_val("TOC.balance.rhs:hpc_PR", 60.0)  # for H2
 
     # Set up the specific cycle parameters
     prob.set_val("fan:PRdes", 1.300),
@@ -748,6 +805,7 @@ if __name__ == "__main__":
     prob["TOC.balance.hpt_PR"] = 4.185
     prob["TOC.fc.balance.Pt"] = 5.272
     prob["TOC.fc.balance.Tt"] = 444.41
+    prob["TOC.inject.mix:W"] = 0.001
 
     FAR_guess = [0.02832, 0.02541, 0.02510]
     W_guess = [1916.13, 1900.0, 802.79]
@@ -777,12 +835,12 @@ if __name__ == "__main__":
         prob[pt + ".lpc.map.RlineMap"] = lpc_Rline_guess[i]
         prob[pt + ".hpc.map.RlineMap"] = hpc_Rline_guess[i]
         prob[pt + ".gearbox.trq_base"] = trq_guess[i]
+        prob[pt + ".inject.mix:W"] = 0.0001
 
     st = time.time()
 
     prob.set_solver_print(level=-1)
     prob.set_solver_print(level=2, depth=1)
-    # prob.run_model()
 
     check_cons_mass = False
     run_sweep = True
@@ -790,93 +848,84 @@ if __name__ == "__main__":
 
     if run_sweep:
         n = 10
-        # w_inject = np.linspace(0.000001, 0.11, n)
-        w_inject = np.linspace(0.08, 0.000001, n)
-        # w_inject = [0.009]
+        w_frac = np.linspace(0.08, 0.000001, n)
         TSFC_CRZ = np.zeros(n)
         TSFC_TOC = np.zeros(n)
-        # T4 = np.linspace(3200, 3600, 3)
-        # T4 = [3500.0]
-        T4 = [3400.0]
+        Wwater = np.zeros(n)
 
-        for T in T4:
-            prob["RTO_T4"] = T
-            for i, w in enumerate(w_inject):
-                print(f"### Running T4={T}, W={w}, Iteration: {i} ###")
-                prob["TOC.inject.mix:W"] = w
-                prob.run_model()
-                TSFC_CRZ[i] = prob.get_val("CRZ.perf.TSFC")
-                TSFC_TOC[i] = prob.get_val("TOC.perf.TSFC")
+        for i, w in enumerate(w_frac):
+            print(f"### Running W_frac={w}, Iteration: {i} ###")
+            prob["TOC.extract.sub_flow.w_frac"] = w
+            # prob["CRZ.extract.sub_flow.w_frac"] = w
+            prob.run_model()
+            TSFC_CRZ[i] = prob.get_val("CRZ.perf.TSFC")
+            TSFC_TOC[i] = prob.get_val("TOC.perf.TSFC")
+            Wwater[i] = prob.get_val("TOC.inject.mix:W")
 
-            with open("../OUTPUT/N3_trends/w_inject_JetA.pkl", "wb") as f:
-                pkl.dump(np.vstack((w_inject, TSFC_CRZ, TSFC_TOC)), f)
+        with open("../OUTPUT/N3_trends/N3_wfrac_JetA_08_TOC.pkl", "wb") as f:
+            pkl.dump(np.vstack((w_frac, Wwater, TSFC_CRZ, TSFC_TOC)), f)
     else:
-        w_inject = 0.058148
-        prob["TOC.inject.mix:W"] = w_inject
+        wfrac = 0.06
+        prob.set_val("TOC.extract.sub_flow.w_frac", wfrac)
 
         prob.run_model()
 
         if save_res is True:
-            output_dir = f"../OUTPUT/N3_output/INJ_{w_inject}"
+            output_dir = f"../OUTPUT/N3_output/CLVR_{wfrac}"
             if os.path.isdir(output_dir) is False:
                 os.mkdir(output_dir)
             with open(f"{output_dir}/output.txt", "w") as file:
                 for pt in ["TOC", "RTO", "SLS", "CRZ"]:
                     viewer(prob, pt, file)
 
-    # data_vec = [
-    #     [
-    #         prob.get_val("TOC_EINOx.EINOx_OD"),
-    #         prob.get_val("RTO_EINOx.EINOx_OD"),
-    #         prob.get_val("CRZ_EINOx.EINOx_SLS"),
-    #         prob.get_val("CRZ_EINOx.EINOx_OD"),
-    #     ],
-    #     [
-    #         prob.get_val("TOC.perf.TSFC"),
-    #         prob.get_val("RTO.perf.TSFC"),
-    #         prob.get_val("SLS.perf.TSFC"),
-    #         prob.get_val("CRZ.perf.TSFC"),
-    #     ],
-    # ]
+        if check_cons_mass:
+            for pt in ["TOC", "RTO", "SLS", "CRZ"]:
+                inlet_air = prob[pt + ".inlet.Fl_O:stat:W"]
+                inject_water = prob[pt + ".inject.mix:W"]
+                extract_water = prob[pt + ".extract.W_water"]
+                fuel_flow = prob[pt + ".burner.Wfuel"]
+                hpc_flow = prob[pt + ".hpc.Fl_O:stat:W"]
+                core_flow = prob[pt + ".duct2.Fl_O:stat:W"]
+                bld_inlet = prob[pt + ".hpc.bld_inlet:stat:W"]
+                bld_exit = prob[pt + ".hpc.bld_exit:stat:W"]
+                cust = prob[pt + ".hpc.cust:stat:W"]
+                turb_flow = prob[pt + ".lpt.Fl_O:stat:W"]
+                extract_out = prob[pt + ".extract.Fl_O:stat:W"]
+                core_nozz_flow = prob[pt + ".core_nozz.Fl_O:stat:W"]
+                byp_nozz_flow = prob[pt + ".byp_nozz.Fl_O:stat:W"]
 
-    # with open("../OUTPUT/N3_trends/N3_H2_mw0_hpcpr65.pkl", "wb") as f:
-    #     pkl.dump(data_vec, f)
+                print("\n")
+                print("#" * 20 + pt + "#" * 20)
+                print("\n")
 
-    # print(data_vec)
+                print("Inlet Air Flow (lbm/s)", inlet_air)
+                print("Inject Water Flow (lbm/s)", inject_water)
+                print("Extract Water Flow (lbm/s)", extract_water)
+                print("Core Flow (lbm/s)", core_flow)
+                # print("Bypass Flow (lbm/s)", bypass_flow)
+                print("Combustor Fuel Flow", fuel_flow)
+                print("Bld_inlet Flow", bld_inlet)
+                print("Bld_exit Flow", bld_exit)
+                print("Customer Flow", cust)
+                print("Core Nozzle Out Flow", core_nozz_flow)
+                print("Bypass Nozzle Out Flow", byp_nozz_flow)
 
-    # for pt in ["TOC"] + prob.model.od_pts:
-    #     viewer(prob, pt)
-
-    # print("Diameter", prob["TOC.fan_dia.FanDia"][0])
-    # print("ER", prob["CRZ.ext_ratio.ER"])
-    # print("EINOx", prob["CRZ.NOx.EINOx"])
-    # print("Composition", prob["CRZ.burner.Fl_O:tot:composition"])
-    # print("Composition", prob["CRZ.burner.Fl_I:tot:composition"])
-    # print("Composition", prob["CRZ.burner.Fl_O:*"])
-
-    # inlet_prod_names = prob.model.TOC.inlet.real_flow.base_thermo.thermo.products
-    # inlet_prod_concs = prob.model.TOC.inlet.real_flow.base_thermo.chem_eq._outputs["n"]
-
-    # inject_prod_names = prob.model.TOC.inject.vitiated_flow.base_thermo.thermo.products
-    # inject_prod_concs = prob.model.TOC.inject.vitiated_flow.base_thermo.chem_eq._outputs["n"]
-
-    # print("CRZ EINOx", prob["CRZ_EINOx.EINOx_OD"])
-    # print("TOC EINOx", prob["TOC_EINOx.EINOx_OD"])
-    # print("RTO EINOx", prob["RTO_EINOx.EINOx_OD"])
-    # print("SLS EINOx", prob["CRZ_EINOx.EINOx_SLS"])
-
-    # print(inlet_prod_names)
-    # print(inlet_prod_concs)
-
-    # print(inject_prod_names)
-    # print(inject_prod_concs)
-
-    # print(100 * "#")
-
-    # for i in range(len(inlet_prod_names)):
-    #     if inlet_prod_names[i] == "H2O":
-    #         print(inlet_prod_names[i], inlet_prod_concs[i])
-    #     if inject_prod_names[i] == "H2O":
-    #         print(inject_prod_names[i], inject_prod_concs[i])
+                print(
+                    "Injector mass flow check (mdot_air + mdot_water - mdot_out): ",
+                    core_flow + inject_water - hpc_flow - bld_exit - bld_inlet - cust,
+                )
+                print(
+                    "Combustor mass flow check (mdot_air-water + mdot_fuel - mdot_out): ",
+                    (core_flow + inject_water) + fuel_flow - turb_flow,
+                )
+                print(
+                    "Extractor mass flow check (mdot_air-water-fuel - mdot_water - mdot_out): ",
+                    turb_flow - extract_water - extract_out,
+                )
+                print(
+                    "Total mass flow check (mdot_in + mdot_fuel - mdot_out): ",
+                    inlet_air - core_nozz_flow - byp_nozz_flow + fuel_flow,
+                )
+                print("Water loop mass flow check (mdot_in - mdot_out): ", extract_water - inject_water)
 
     print("time", time.time() - st)
