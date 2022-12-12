@@ -648,7 +648,8 @@ if __name__ == "__main__":
     # Define the design point
     prob.set_val("TOC.fc.W", 820.44097898, units="lbm/s")
     prob.set_val("TOC.splitter.BPR", 23.94514401),
-    prob.set_val("TOC.balance.rhs:hpc_PR", 53.6332)
+    prob.set_val("TOC.balance.rhs:hpc_PR", 53.6332)  # for JetA
+    # prob.set_val("TOC.balance.rhs:hpc_PR", 60.0)  # for H2
 
     # Set up the specific cycle parameters
     prob.set_val("fan:PRdes", 1.3),  # lower=1.2, upper=1.36

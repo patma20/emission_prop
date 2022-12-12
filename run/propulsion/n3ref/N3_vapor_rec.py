@@ -26,7 +26,7 @@ import numpy as np
 # ==============================================================================
 # import pycycle.constants as con
 
-from components.emissions import EINOx
+from components.emissions import EINOx, TSEC
 from components.injector import Injector
 from components.extractor import WaterBleed
 
@@ -74,7 +74,7 @@ class N3(pyc.Cycle):
         self.add_subsystem(
             "fc", pyc.FlightConditions(composition=pyc.CEA_AIR_COMPOSITION, reactant="Water", mix_ratio_name="WAR")
         )
-        inlet = self.add_subsystem("inlet", pyc.Inlet())
+        self.add_subsystem("inlet", pyc.Inlet())
         self.add_subsystem(
             "fan",
             pyc.Compressor(map_data=FanMap, map_extrap=True, bleed_names=[]),
@@ -118,16 +118,26 @@ class N3(pyc.Cycle):
         self.add_subsystem("hp_shaft", pyc.Shaft(num_ports=2), promotes_inputs=[("Nmech", "HP_Nmech")])
         self.add_subsystem("perf", pyc.Performance(num_nozzles=2, num_burners=1))
 
-        inject = self.add_subsystem("inject", Injector(reactant="Water", mix_name="mix"))
-        extract = self.add_subsystem("extract", WaterBleed())
+        fuel_vars = self.add_subsystem("fuelVars", om.IndepVarComp(), promotes_outputs=["*"])
+        if not self.options["use_h2"]:
+            LHV = 18564  # Lower Heating Value of JetA in BTU/lb
+        else:
+            LHV = 51591  # Lower Heating Value of H2 in BTU/lb
+        fuel_vars.add_output("fuel_lhv", val=LHV, units="Btu/lbm")
+        self.add_subsystem("tsec_perf", TSEC())
 
-        # Thermodynamic connections
+        self.add_subsystem("extract", WaterBleed())
+        self.add_subsystem("inject", Injector(reactant="Water", mix_name="mix"))
+
+        # Performance connections
         self.connect("inlet.Fl_O:tot:P", "perf.Pt2")
         self.connect("hpc.Fl_O:tot:P", "perf.Pt3")
         self.connect("burner.Wfuel", "perf.Wfuel_0")
         self.connect("inlet.F_ram", "perf.ram_drag")
         self.connect("core_nozz.Fg", "perf.Fg_0")
         self.connect("byp_nozz.Fg", "perf.Fg_1")
+        self.connect("perf.TSFC", "tsec_perf.TSFC")
+        self.connect("fuel_lhv", "tsec_perf.LHV")
 
         # Mechanical Connections
         self.connect("fan.trq", "fan_shaft.trq_0")
@@ -182,6 +192,8 @@ class N3(pyc.Cycle):
             "lp_shaft",
             "hp_shaft",
             "perf",
+            "fuelVars",
+            "tsec_perf",
             "ext_ratio",
         ]
 
@@ -386,7 +398,7 @@ class N3(pyc.Cycle):
         # newton.linesearch = om.BoundsEnforceLS()
         newton.linesearch = om.ArmijoGoldsteinLS()
         newton.linesearch.options["rho"] = 0.75
-        # newton.linesearch.options['maxiter'] = 2
+        # newton.linesearch.options["maxiter"] = 1
         newton.linesearch.options["iprint"] = -1
 
         self.linear_solver = om.DirectSolver()
@@ -408,6 +420,7 @@ def viewer(prob, pt, file=sys.stdout):
         prob[pt + ".inlet.F_ram"],
         prob[pt + ".perf.OPR"],
         prob[pt + ".perf.TSFC"],
+        prob[pt + ".tsec_perf.TSEC"],
         prob[pt + ".splitter.BPR"],
         prob[pt + ".extract.sub_flow.W_water"],
         prob[pt + ".inject.mix:W"],
@@ -421,12 +434,14 @@ def viewer(prob, pt, file=sys.stdout):
     print("----------------------------------------------------------------------------", file=file, flush=True)
     print("                       PERFORMANCE CHARACTERISTICS", file=file, flush=True)
     print(
-        "    Mach      Alt       W      Fn      Fg    Fram     OPR     TSFC      BPR      Wext      Winj ",
+        "    Mach      Alt       W      Fn      Fg    Fram     OPR     TSFC      TSEC      BPR      Wext      Winj ",
         file=file,
         flush=True,
     )
     print(
-        " %7.5f  %7.1f %7.3f %7.1f %7.1f %7.1f %7.3f  %7.5f  %7.3f  %7.5f  %7.5f" % summary_data, file=file, flush=True
+        " %7.5f  %7.1f %7.3f %7.1f %7.1f %7.1f %7.3f  %7.5f  %7.5f  %7.3f  %7.5f  %7.5f" % summary_data,
+        file=file,
+        flush=True,
     )
 
     fs_names = [
@@ -546,7 +561,7 @@ class MPN3(pyc.MPCycle):
         self.set_input_defaults("TOC.fc.WAR", alt_war),
         self.set_input_defaults("TOC.inject.MN", 0.45),
         self.set_input_defaults("TOC.extract.MN", 0.25),
-        self.set_input_defaults("TOC.extract.sub_flow.w_frac", 0.0001),
+        self.set_input_defaults("TOC.extract.sub_flow.w_frac", 0.01),
 
         self.pyc_add_cycle_param("burner.dPqP", 0.0400),
         self.pyc_add_cycle_param("core_nozz.Cv", 0.9999),
@@ -568,8 +583,8 @@ class MPN3(pyc.MPCycle):
         self.pyc_add_cycle_param("lpt.bld_inlet:frac_P", 1.0),
         self.pyc_add_cycle_param("lpt.bld_exit:frac_P", 0.0),
         self.pyc_add_cycle_param("byp_bld.bypBld:frac_W", 0.0),
-        self.pyc_add_cycle_param("inject.dPqP", 0.01),
-        self.pyc_add_cycle_param("extract.dPqP", 0.001),
+        self.pyc_add_cycle_param("inject.dPqP", 0.0),
+        self.pyc_add_cycle_param("extract.dPqP", 0.0),
 
         # OTHER POINTS (OFF-DESIGN)
         self.od_pts = ["RTO", "SLS", "CRZ"]
@@ -580,7 +595,7 @@ class MPN3(pyc.MPCycle):
         self.od_BPRs = [1.75, 1.75, 1.9397]
         self.od_recoveries = [0.9970, 0.9950, 0.9980]
         self.war = [sls_war, sls_war, alt_war]
-        self.w_frac = [0.0001, 0.0001, 0.0001]
+        self.w_frac = [0.00001, 0.00001, 0.00001]
 
         for i, pt in enumerate(self.od_pts):
             self.pyc_add_pnt(pt, N3(design=False, use_h2=use_h2, wet_air=wet_air, cooling=self.cooling[i]))
@@ -715,7 +730,7 @@ class MPN3(pyc.MPCycle):
         newton.options["atol"] = 1e-6
         newton.options["rtol"] = 1e-6
         newton.options["iprint"] = 2
-        newton.options["maxiter"] = 20
+        newton.options["maxiter"] = 10
         newton.options["solve_subsystems"] = True
         newton.options["max_sub_solves"] = 10
         newton.options["err_on_non_converge"] = True
@@ -723,17 +738,6 @@ class MPN3(pyc.MPCycle):
         newton.linesearch = om.BoundsEnforceLS()
         newton.linesearch.options["bound_enforcement"] = "scalar"
         newton.linesearch.options["iprint"] = -1
-
-        # nonlinear = self.nonlinear_solver = om.NonlinearBlockGS()
-        # nonlinear.options["atol"] = 1e-6
-        # nonlinear.options["rtol"] = 1e-99
-        # nonlinear.options["iprint"] = 2
-        # nonlinear.options["maxiter"] = 15
-
-        # self.connect("TOC.extract.W_water", "TOC.inject.mix:W")
-        # self.connect("RTO.extract.W_water", "RTO.inject.mix:W")
-        # self.connect("SLS.extract.W_water", "SLS.inject.mix:W")
-        # self.connect("CRZ.extract.W_water", "CRZ.inject.mix:W")
 
         self.linear_solver = om.DirectSolver(assemble_jac=True)
 
@@ -744,7 +748,7 @@ def N3ref_model():
 
     prob = om.Problem()
 
-    prob.model = MPN3(use_h2=False, wet_air=True)
+    prob.model = MPN3(use_h2=True, wet_air=True)
 
     # setup the optimization
     prob.driver = om.ScipyOptimizeDriver()
@@ -800,25 +804,60 @@ if __name__ == "__main__":
     prob.set_val("RTO.hpt_cooling.x_factor", 0.9)
 
     # Set initial guesses for balances
-    prob["TOC.balance.FAR"] = 0.02650
-    prob["TOC.balance.lpt_PR"] = 10.937
-    prob["TOC.balance.hpt_PR"] = 4.185
-    prob["TOC.fc.balance.Pt"] = 5.272
-    prob["TOC.fc.balance.Tt"] = 444.41
-    prob["TOC.inject.mix:W"] = 0.001
+    if prob.model.options["use_h2"]:
+        prob["TOC.balance.FAR"] = 0.0102
+        prob["TOC.balance.lpt_PR"] = 9.8
+        prob["TOC.balance.hpt_PR"] = 4.2
+        prob["TOC.fc.balance.Pt"] = 5.2
+        prob["TOC.fc.balance.Tt"] = 444.3
+        prob["TOC.inject.mix:W"] = 0.0
 
-    FAR_guess = [0.02832, 0.02541, 0.02510]
-    W_guess = [1916.13, 1900.0, 802.79]
-    BPR_guess = [25.5620, 22.3467, 24.3233]
-    fan_Nmech_guess = [2132.6, 1953.1, 2118.7]
-    lp_Nmech_guess = [6611.2, 6054.5, 6567.9]
-    hp_Nmech_guess = [22288.2, 21594.0, 20574.1]
-    hpt_PR_guess = [4.210, 4.245, 4.197]
-    lpt_PR_guess = [8.161, 7.001, 10.803]
-    fan_Rline_guess = [1.7500, 1.7500, 1.9397]
-    lpc_Rline_guess = [2.0052, 1.8632, 2.1075]
-    hpc_Rline_guess = [2.0589, 2.0281, 1.9746]
-    trq_guess = [52509.1, 41779.4, 22369.7]
+        # FAR_guess = [0.0106, 0.0095, 0.0094]
+        # W_guess = [1906.3, 1728.4, 797.5]
+        # BPR_guess = [26.1, 28.0, 24.8]
+        # fan_Nmech_guess = [2119.9, 1945.5, 2095.7]
+        # lp_Nmech_guess = [6572.0, 6031.3, 6496.8]
+        # hp_Nmech_guess = [22150.0, 21462.8, 20431.0]
+        # hpt_PR_guess = [4.2, 4.3, 4.2]
+        # lpt_PR_guess = [8.0, 7.0, 9.9]
+        # fan_Rline_guess = [1.7500, 1.7500, 1.9397]
+        # lpc_Rline_guess = [1.9, 1.7, 2.0]
+        # hpc_Rline_guess = [2.0, 2.0, 1.9]
+        # trq_guess = [52047.8, 41530.5, 21780.5]
+
+        FAR_guess = [0.0106, 0.02541, 0.0094]
+        W_guess = [1906.3, 1900.4, 797.5]
+        BPR_guess = [26.1, 22.3467, 24.8]
+        fan_Nmech_guess = [2119.9, 1953.1, 2095.7]
+        lp_Nmech_guess = [6572.0, 6054.5, 6496.8]
+        hp_Nmech_guess = [22150.0, 21594.0, 20431.0]
+        hpt_PR_guess = [4.2, 4.245, 4.2]
+        lpt_PR_guess = [8.0, 7.001, 9.9]
+        fan_Rline_guess = [1.7500, 1.7500, 1.9397]
+        lpc_Rline_guess = [1.9, 1.8632, 2.0]
+        hpc_Rline_guess = [2.0, 2.0281, 1.9]
+        trq_guess = [52047.8, 41779.4, 21780.5]
+
+    else:
+        prob["TOC.balance.FAR"] = 0.02650
+        prob["TOC.balance.lpt_PR"] = 10.937
+        prob["TOC.balance.hpt_PR"] = 4.185
+        prob["TOC.fc.balance.Pt"] = 5.272
+        prob["TOC.fc.balance.Tt"] = 444.41
+        prob["TOC.inject.mix:W"] = 0.000
+
+        FAR_guess = [0.02832, 0.02541, 0.02510]
+        W_guess = [1916.13, 1900.0, 802.79]
+        BPR_guess = [25.5620, 22.3467, 24.3233]
+        fan_Nmech_guess = [2132.6, 1953.1, 2118.7]
+        lp_Nmech_guess = [6611.2, 6054.5, 6567.9]
+        hp_Nmech_guess = [22288.2, 21594.0, 20574.1]
+        hpt_PR_guess = [4.210, 4.245, 4.197]
+        lpt_PR_guess = [8.161, 7.001, 10.803]
+        fan_Rline_guess = [1.7500, 1.7500, 1.9397]
+        lpc_Rline_guess = [2.0052, 1.8632, 2.1075]
+        hpc_Rline_guess = [2.0589, 2.0281, 1.9746]
+        trq_guess = [52509.1, 41779.4, 22369.7]
 
     for i, pt in enumerate(prob.model.od_pts):
 
@@ -835,40 +874,87 @@ if __name__ == "__main__":
         prob[pt + ".lpc.map.RlineMap"] = lpc_Rline_guess[i]
         prob[pt + ".hpc.map.RlineMap"] = hpc_Rline_guess[i]
         prob[pt + ".gearbox.trq_base"] = trq_guess[i]
-        prob[pt + ".inject.mix:W"] = 0.0001
+        prob[pt + ".inject.mix:W"] = 0.000
 
     st = time.time()
 
     prob.set_solver_print(level=-1)
     prob.set_solver_print(level=2, depth=1)
 
-    check_cons_mass = False
-    run_sweep = True
+    check_cons_mass = True
+    run_sweep = False
     save_res = False
+    print_outputs = True
 
     if run_sweep:
-        n = 10
-        w_frac = np.linspace(0.08, 0.000001, n)
+        n = 3
+        w_frac = np.linspace(0.05, 0.075, n)
         TSFC_CRZ = np.zeros(n)
         TSFC_TOC = np.zeros(n)
         Wwater = np.zeros(n)
 
         for i, w in enumerate(w_frac):
-            print(f"### Running W_frac={w}, Iteration: {i} ###")
+            print(f"### Running W_frac={w}, Iteration: {i+1} ###")
             prob["TOC.extract.sub_flow.w_frac"] = w
+            prob["RTO.extract.sub_flow.w_frac"] = 0.0
+            prob["SLS.extract.sub_flow.w_frac"] = 0.0
+            prob["CRZ.extract.sub_flow.w_frac"] = 0.0
+            # prob["CRZ.extract.sub_flow.w_frac"] = w
             # prob["CRZ.extract.sub_flow.w_frac"] = w
             prob.run_model()
             TSFC_CRZ[i] = prob.get_val("CRZ.perf.TSFC")
             TSFC_TOC[i] = prob.get_val("TOC.perf.TSFC")
             Wwater[i] = prob.get_val("TOC.inject.mix:W")
 
-        with open("../OUTPUT/N3_trends/N3_wfrac_JetA_08_TOC.pkl", "wb") as f:
+        fname = "../OUTPUT/N3_trends/N3_wfrac_H2_05-08_TOC.pkl"
+        # fname = "../OUTPUT/N3_trends/N3_wfrac_JetA_10_TOC.pkl"
+        with open(fname, "wb") as f:
             pkl.dump(np.vstack((w_frac, Wwater, TSFC_CRZ, TSFC_TOC)), f)
     else:
-        wfrac = 0.06
+        wfrac = 0.0000
         prob.set_val("TOC.extract.sub_flow.w_frac", wfrac)
+        prob.set_val("RTO.extract.sub_flow.w_frac", wfrac)
+        prob.set_val("SLS.extract.sub_flow.w_frac", wfrac)
+        prob.set_val("CRZ.extract.sub_flow.w_frac", wfrac)
+
+        # prob.model.RTO.nonlinear_solver.options["maxiter"] = 2
+        # prob.model.SLS.nonlinear_solver.options["maxiter"] = 0
+        # prob.model.CRZ.nonlinear_solver.options["maxiter"] = 0
+        # prob.model.nonlinear_solver.options["maxiter"] = 0
+        # prob.model.nonlinear_solver.options["err_on_non_converge"] = False
 
         prob.run_model()
+        # prob.model.list_outputs(residuals=True, explicit=True, includes="RTO*", residuals_tol=1e-2, prom_name=True)
+        # prob.check_partials(compact_print=True, show_only_incorrect=True, method="fd")
+
+        if print_outputs:
+            print("\n")
+            print("#" * 20 + " TOC " + "#" * 20)
+            print("\n")
+            print(prob["TOC.balance.FAR"])
+            print(prob["TOC.balance.lpt_PR"])
+            print(prob["TOC.balance.hpt_PR"])
+            print(prob["TOC.fc.balance.Pt"])
+            print(prob["TOC.fc.balance.Tt"])
+            print(prob["TOC.inject.mix:W"])
+
+            for pt in ["RTO", "SLS", "CRZ"]:
+                print("\n")
+                print("#" * 20 + f" {pt} " + "#" * 20)
+                print("\n")
+                print(prob[pt + ".balance.FAR"])
+                print(prob[pt + ".balance.W"])
+                print(prob[pt + ".balance.BPR"])
+                print(prob[pt + ".balance.fan_Nmech"])
+                print(prob[pt + ".balance.lp_Nmech"])
+                print(prob[pt + ".balance.hp_Nmech"])
+                print(prob[pt + ".hpt.PR"])
+                print(prob[pt + ".lpt.PR"])
+                print(prob[pt + ".fan.map.RlineMap"])
+                print(prob[pt + ".lpc.map.RlineMap"])
+                print(prob[pt + ".hpc.map.RlineMap"])
+                print(prob[pt + ".gearbox.trq_base"])
+                print(prob[pt + ".inject.mix:W"])
 
         if save_res is True:
             output_dir = f"../OUTPUT/N3_output/CLVR_{wfrac}"
@@ -895,7 +981,7 @@ if __name__ == "__main__":
                 byp_nozz_flow = prob[pt + ".byp_nozz.Fl_O:stat:W"]
 
                 print("\n")
-                print("#" * 20 + pt + "#" * 20)
+                print("#" * 20 + f" {pt} " + "#" * 20)
                 print("\n")
 
                 print("Inlet Air Flow (lbm/s)", inlet_air)
@@ -929,3 +1015,73 @@ if __name__ == "__main__":
                 print("Water loop mass flow check (mdot_in - mdot_out): ", extract_water - inject_water)
 
     print("time", time.time() - st)
+
+    # FAR_guess = [0.01060631, 0.00952807, 0.00942863]
+    # W_guess = [1906.38417587, 1728.43191666, 797.50729153]
+    # BPR_guess = [26.10876844, 28.0348248, 24.86901046]
+    # fan_Nmech_guess = [2119.99434504, 1945.57180666, 2095.74560509]
+    # lp_Nmech_guess = [6572.03099319, 6031.31713194, 6496.85934433]
+    # hp_Nmech_guess = [22150.04207581, 21462.82896983, 20431.08203631]
+    # hpt_PR_guess = [4.26770004, 4.30696236, 4.26332924]
+    # lpt_PR_guess = [8.05410041, 7.03976072, 9.91209521]
+    # fan_Rline_guess = [1.7500, 1.7500, 1.9397]
+    # lpc_Rline_guess = [1.93901551, 1.78563311, 2.05679571]
+    # hpc_Rline_guess = [2.03522272, 2.00229121, 1.94122564]
+    # trq_guess = [52047.86253509, 41530.55101615, 21780.53908646]
+
+    # TOC
+
+    # [0.01058445]
+    # [8.83640269]
+    # [3.68548432]
+    # [5.27241356]
+    # [444.38571023]
+    # [5.53875858e-17]
+
+    # RTO
+
+    # [0.0107268]
+    # [1898.94366506]
+    # [26.33123016]
+    # [2108.88732994]
+    # [6537.59899216]
+    # [22068.75118865]
+    # [3.70799239]
+    # [7.6900684]
+    # [1.75]
+    # [1.89954133]
+    # [2.02907959]
+    # [51479.19974723]
+    # [1.73452819e-18]
+
+    # SLS
+
+    # [0.00963605]
+    # [1724.36608166]
+    # [28.3085683]
+    # [1939.29838741]
+    # [6011.86938866]
+    # [21404.78271756]
+    # [3.74159721]
+    # [6.83258971]
+    # [1.75]
+    # [1.74711975]
+    # [2.01981525]
+    # [41199.46728224]
+    # [0.]
+
+    # CRZ
+
+    # [0.00957495]
+    # [793.17464512]
+    # [25.15241235]
+    # [2075.03336372]
+    # [6432.65092199]
+    # [20322.76338571]
+    # [3.70448951]
+    # [8.87189997]
+    # [1.9397]
+    # [2.02177795]
+    # [1.93450893]
+    # [21243.23457868]
+    # [5.60170296e-17]

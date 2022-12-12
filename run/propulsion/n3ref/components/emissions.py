@@ -18,6 +18,23 @@ import numpy as np
 # ==============================================================================
 
 
+class TSEC(om.ExplicitComponent):
+    def setup(self):
+        self.add_input("TSFC", val=0.4, desc="Thrust-specific fuel consumption", units="lbm/(h*lbf)")
+        self.add_input("LHV", val=18564, desc="Lower heating value of fuel", units="Btu/lbm")
+
+        self.add_output("TSEC", val=800.0, desc="Thrust-specific energy consumption", units="Btu/(h*lbf)")
+
+        self.declare_partials("TSEC", ["TSFC", "LHV"])
+
+    def compute(self, inputs, outputs):
+        outputs["TSEC"] = inputs["TSFC"] * inputs["LHV"]
+
+    def compute_partials(self, inputs, J):
+        J["TSEC", "TSFC"] = inputs["LHV"]
+        J["TSEC", "LHV"] = inputs["TSFC"]
+
+
 class NOxT4(om.ExplicitComponent):
     """
     Calculates NOx emissions of a combustor base on pre-combustor

@@ -15,32 +15,6 @@ from pycycle.passthrough import PassThrough
 from pycycle.element_base import Element
 
 
-class MixtureRatio(om.ExplicitComponent):
-    """
-    Calculates the mixture ratio of a reactant and an input flow.
-    """
-
-    def setup(self):
-        self.add_input("mdot_r", val=1.0, units="lbm/s")
-        self.add_input("mdot_a", val=1.0, units="lbm/s")
-
-        self.add_output("mix_ratio", val=1.0, desc="mixture-air ratio")
-        self.declare_partials("mix_ratio", ["mdot_r", "mdot_a"])
-
-    def compute(self, inputs, outputs):
-        mdot_r = inputs["mdot_r"]
-        mdot_a = inputs["mdot_a"]
-
-        outputs["mix_ratio"] = mdot_r / mdot_a
-
-    def compute_partials(self, inputs, J):
-        mdot_r = inputs["mdot_r"]
-        mdot_a = inputs["mdot_a"]
-
-        J["mix_ratio", "mdot_r"] = 1 / mdot_a
-        J["mix_ratio", "mdot_a"] = -mdot_r / mdot_a ** 2
-
-
 class Injector(Element):
     """
     A injector that adds a reactant to an incoming flow mixture
@@ -158,187 +132,30 @@ class Injector(Element):
         prom_in = [("Pt_in", "Fl_I:tot:P"), "dPqP"]
         self.add_subsystem("p_loss", PressureLoss(), promotes_inputs=prom_in)
 
-        # Calculate vitiated flow station properties
-        vit_flow = Thermo(
+        # Calculate new composition flow station properties
+        real_flow = Thermo(
             mode="total_hP",
             fl_name="Fl_O:tot",
             method=thermo_method,
             thermo_kwargs={"composition": air_react_composition, "spec": thermo_data},
         )
-        self.add_subsystem("vitiated_flow", vit_flow, promotes_outputs=["Fl_O:*"])
-        self.connect("mix_react.mass_avg_h", "vitiated_flow.h")
-        self.connect("mix_react.composition_out", "vitiated_flow.composition")
-        self.connect("p_loss.Pt_out", "vitiated_flow.P")
-
-        if statics:
-            if design:
-                # Calculate static properties.
-
-                out_stat = Thermo(
-                    mode="static_MN",
-                    fl_name="Fl_O:stat",
-                    method=thermo_method,
-                    thermo_kwargs={"composition": air_react_composition, "spec": thermo_data},
-                )
-                prom_in = ["MN"]
-                prom_out = ["Fl_O:stat:*"]
-                self.add_subsystem("out_stat", out_stat, promotes_inputs=prom_in, promotes_outputs=prom_out)
-
-                self.connect("mix_react.composition_out", "out_stat.composition")
-                self.connect("Fl_O:tot:S", "out_stat.S")
-                self.connect("Fl_O:tot:h", "out_stat.ht")
-                self.connect("Fl_O:tot:P", "out_stat.guess:Pt")
-                self.connect("Fl_O:tot:gamma", "out_stat.guess:gamt")
-                self.connect("Wout", "out_stat.W")
-
-            else:
-                # Calculate static properties.
-                out_stat = Thermo(
-                    mode="static_A",
-                    fl_name="Fl_O:stat",
-                    method=thermo_method,
-                    thermo_kwargs={"composition": air_react_composition, "spec": thermo_data},
-                )
-                prom_in = ["area"]
-                prom_out = ["Fl_O:stat:*"]
-                self.add_subsystem("out_stat", out_stat, promotes_inputs=prom_in, promotes_outputs=prom_out)
-                self.connect("mix_react.composition_out", "out_stat.composition")
-
-                self.connect("Fl_O:tot:S", "out_stat.S")
-                self.connect("Fl_O:tot:h", "out_stat.ht")
-                self.connect("Fl_O:tot:P", "out_stat.guess:Pt")
-                self.connect("Fl_O:tot:gamma", "out_stat.guess:gamt")
-                self.connect("Wout", "out_stat.W")
-
-        else:
-            self.add_subsystem("W_passthru", PassThrough("Wout", "Fl_O:stat:W", 1.0, units="lbm/s"), promotes=["*"])
-
-        super().setup()
-
-
-class InjectorOLD(Element):
-    """
-    A injector that adds a reactant to an incoming flow mixture
-
-    --------------
-    Flow Stations
-    --------------
-    Fl_I
-    Fl_O
-
-    -------------
-    Design
-    -------------
-        inputs
-        --------
-        WAR
-        dPqP
-        MN
-
-        outputs
-        --------
-        Wreact
-
-
-    -------------
-    Off-Design
-    -------------
-        inputs
-        --------
-        WAR
-        dPqP
-        area
-
-        outputs
-        --------
-        Wreact
-
-    """
-
-    def initialize(self):
-
-        self.options.declare("statics", default=True, desc="If True, calculate static properties.")
-        self.options.declare(
-            "reactant",
-            default=False,
-            types=(bool, str),
-            desc="If False, flow matches base composition. If a string, then that reactant "
-            "is mixed into the flow at at the ratio set by the `mix_ratio` input",
-        )
-        self.options.declare(
-            "mix_ratio_name",
-            default="mix:ratio",
-            desc="The name of the input that governs the mix ratio of the reactant to the primary flow",
-        )
-
-        super().initialize()
-
-    def pyc_setup_output_ports(self):
-
-        thermo_method = self.options["thermo_method"]
-        thermo_data = self.options["thermo_data"]
-        reactant = self.options["reactant"]
-
-        self.thermo_add_comp = ThermoAdd(
-            method=thermo_method,
-            mix_mode="reactant",
-            thermo_kwargs={
-                "spec": thermo_data,
-                "inflow_composition": self.Fl_I_data["Fl_I"],
-                "mix_composition": reactant,
-            },
-        )
-
-        self.copy_flow(self.thermo_add_comp, "Fl_O")
-
-    def setup(self):
-        thermo_method = self.options["thermo_method"]
-        thermo_data = self.options["thermo_data"]
-
-        # inflow_composition = self.Fl_I_data["Fl_I"]
-        air_react_composition = self.Fl_O_data["Fl_O"]
-        design = self.options["design"]
-        statics = self.options["statics"]
-
-        mix_ratio_name = self.options["mix_ratio_name"]
-
-        # Compute reactant-air mixture ratio
-        self.add_subsystem(
-            "MR", MixtureRatio(), promotes=["mdot_r", ("mdot_a", "Fl_I:stat:W"), ("mix_ratio", "mix:ratio")]
-        )
-
-        # Create injector flow station
-        in_flow = FlowIn(fl_name="Fl_I")
-        self.add_subsystem("in_flow", in_flow, promotes=["Fl_I:tot:*", "Fl_I:stat:*"])
-
-        self.add_subsystem(
-            "mix_react",
-            self.thermo_add_comp,
-            promotes=[
-                "Fl_I:stat:W",
-                ("mix:ratio", mix_ratio_name),
-                "Fl_I:tot:composition",
-                "Fl_I:tot:h",
-                ("mix:W", "Wreact"),
-                "Wout",
-            ],
-        )
-
-        # Pressure loss
-        prom_in = [("Pt_in", "Fl_I:tot:P"), "dPqP"]
-        self.add_subsystem("p_loss", PressureLoss(), promotes_inputs=prom_in)
+        # prom_in = [("composition", "Fl_I:tot:composition"), ("T", "Fl_I:tot:T"), ("P", "Fl_I:tot:P")]
+        self.add_subsystem("real_flow", real_flow, promotes_outputs=["Fl_O:*"])  # promotes_inputs=prom_in
+        self.connect("mix_react.mass_avg_h", "real_flow.h")
+        self.connect("mix_react.composition_out", "real_flow.composition")
+        self.connect("p_loss.Pt_out", "real_flow.P")
 
         # Calculate vitiated flow station properties
-        vit_flow = Thermo(
-            mode="total_hP",
-            fl_name="Fl_O:tot",
-            method=thermo_method,
-            thermo_kwargs={"composition": air_react_composition, "spec": thermo_data},
-        )
-        self.add_subsystem("vitiated_flow", vit_flow, promotes_outputs=["Fl_O:*"])
-        self.connect("mix_react.mass_avg_h", "vitiated_flow.h")
-        self.connect("mix_react.composition_out", "vitiated_flow.composition")
-        self.connect("p_loss.Pt_out", "vitiated_flow.P")
+        # vit_flow = Thermo(
+        #     mode="total_hP",
+        #     fl_name="Fl_O:tot",
+        #     method=thermo_method,
+        #     thermo_kwargs={"composition": air_react_composition, "spec": thermo_data},
+        # )
+        # self.add_subsystem("vitiated_flow", vit_flow, promotes_outputs=["Fl_O:*"])
+        # self.connect("mix_react.mass_avg_h", "vitiated_flow.h")
+        # self.connect("mix_react.composition_out", "vitiated_flow.composition")
+        # self.connect("p_loss.Pt_out", "vitiated_flow.P")
 
         if statics:
             if design:

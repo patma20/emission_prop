@@ -673,8 +673,8 @@ class MPN3(pyc.MPCycle):
         newton.options["maxiter"] = 20
         newton.options["solve_subsystems"] = True
         newton.options["max_sub_solves"] = 10
-        newton.options["err_on_non_converge"] = True
-        newton.options["reraise_child_analysiserror"] = False
+        newton.options["err_on_non_converge"] = False
+        newton.options["reraise_child_analysiserror"] = True
         newton.linesearch = om.BoundsEnforceLS()
         newton.linesearch.options["bound_enforcement"] = "scalar"
         newton.linesearch.options["iprint"] = -1
@@ -688,7 +688,7 @@ def N3ref_model():
 
     prob = om.Problem()
 
-    prob.model = MPN3(use_h2=False, wet_air=True)
+    prob.model = MPN3(use_h2=True, wet_air=True)
 
     # setup the optimization
     prob.driver = om.ScipyOptimizeDriver()
@@ -731,7 +731,8 @@ if __name__ == "__main__":
     # Define the design point
     prob.set_val("TOC.fc.W", 820.44097898, units="lbm/s")
     prob.set_val("TOC.splitter.BPR", 23.94514401),
-    prob.set_val("TOC.balance.rhs:hpc_PR", 53.6332)  # 60.0
+    prob.set_val("TOC.balance.rhs:hpc_PR", 53.6332)  # for JetA
+    prob.set_val("TOC.balance.rhs:hpc_PR", 60.0)  # for H2
 
     # Set up the specific cycle parameters
     prob.set_val("fan:PRdes", 1.300),
@@ -785,7 +786,7 @@ if __name__ == "__main__":
     # prob.run_model()
 
     check_cons_mass = False
-    run_sweep = True
+    run_sweep = False
     save_res = False
 
     if run_sweep:
@@ -811,10 +812,26 @@ if __name__ == "__main__":
             with open("../OUTPUT/N3_trends/w_inject_JetA.pkl", "wb") as f:
                 pkl.dump(np.vstack((w_inject, TSFC_CRZ, TSFC_TOC)), f)
     else:
-        w_inject = 0.058148
+        w_inject = 0.00001
         prob["TOC.inject.mix:W"] = w_inject
 
         prob.run_model()
+        # prob.model.list_outputs(residuals=True, explicit=True, residuals_tol=1e-2, prom_name=True)
+
+        for i in enumerate(prob.model.od_pts):
+            print(prob[pt + ".balance.FAR"])
+            print(prob[pt + ".balance.W"])
+            print(prob[pt + ".balance.BPR"])
+            print(prob[pt + ".balance.fan_Nmech"])
+            print(prob[pt + ".balance.lp_Nmech"])
+            print(prob[pt + ".balance.hp_Nmech"])
+            print(prob[pt + ".hpt.PR"])
+            print(prob[pt + ".lpt.PR"])
+            print(prob[pt + ".fan.map.RlineMap"])
+            print(prob[pt + ".lpc.map.RlineMap"])
+            print(prob[pt + ".hpc.map.RlineMap"])
+            print(prob[pt + ".gearbox.trq_base"])
+            print(prob[pt + ".inject.mix:W"])
 
         if save_res is True:
             output_dir = f"../OUTPUT/N3_output/INJ_{w_inject}"

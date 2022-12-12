@@ -377,12 +377,94 @@ def vert_bar(dirpath):
     return
 
 
+def plot_TSFC_wfrac(fname):
+    plt.figure(figsize=(14, 10))
+
+    with open(fname, "rb") as f:
+        data = pkl.load(f)
+
+        with open("../OUTPUT/N3_trends/N3_wfrac_H2_05-08_TOC.pkl", "rb") as f:
+            data2 = pkl.load(f)
+
+            xdata = np.append(data[0], data2[0])
+            # xdata = data[1]
+            y1data = np.append(data[2], data2[2])
+            y2data = np.append(data[3], data2[3])
+
+    # plt.plot(xdata, (y1data - y1data[-1]) / y1data[-1] * 100, label="CRZ", linewidth=5)
+    # plt.plot(xdata, (y2data - y2data[-1]) / y2data[-1] * 100, label="TOC", linewidth=5)
+    plt.plot(xdata, (y1data - y1data[0]) / y1data[0] * 100, label="CRZ (0% water recovered)", linewidth=5)
+    plt.plot(xdata, (y2data - y2data[0]) / y2data[0] * 100, label="TOC", linewidth=5)
+    # plt.plot(xdata, (y1data - y1data[-1]) / y1data[-1] * 100, label="CRZ", linewidth=5)
+    # plt.plot(
+    #     xdata,
+    #     (y2data - y2data[-1]) / y2data[-1] * 100,
+    #     label="TOC, (constant 10% exhaust water recovery)",
+    #     linewidth=5,
+    # )
+    # plt.scatter([0.06148998], [0.43719117], color="red", s=100, zorder=1, label="SNOPT Optimum")
+
+    plt.xlabel("Fraction of core exhaust water recovered (TOC)")
+    # plt.xlabel("Fraction of core exhaust water recovered (CRZ)")
+    # plt.xlabel("Water flow rate (lbm/s)")
+    plt.ylabel("Percent\nDifference TSFC", rotation="horizontal", ha="right", va="center")
+    plt.legend()
+    # plt.show()
+    fname = "TSFC_N3-CLVR-H2-05-TOC"
+    # fname = "TSFC_N3-CLVR-29-CRZ"
+    # fname = "TSFC_N3-inject-upd"
+    plt.savefig("plots/" + fname + ".pdf")
+    plt.savefig("plots/" + fname + ".png")
+
+
+def plot_TSFC_compare(fname1, fname2):
+    plt.figure(figsize=(14, 10))
+
+    with open(fname1, "rb") as f:
+        data = pkl.load(f)
+
+        # xdata = data[0]
+        xdata = data[1]
+        y1data = data[2]
+        y2data = data[3]
+
+        # plt.plot(xdata, y1data, label="CRZ")
+        plt.plot(xdata, y2data, label="Water Recovery")
+
+    with open(fname2, "rb") as f:
+        data = pkl.load(f)
+
+        xdata = data[0]
+        y1data = data[1]
+        y2data = data[2]
+
+        # plt.plot(xdata, y1data, label="CRZ")
+        plt.plot(xdata, y2data, label="Water Injection")
+        plt.plot(xdata, y2data[-1] * np.ones(y2data.size), label="No Injection")
+
+    # plt.xlabel("Fraction of water recovered")
+    plt.xlabel("Water flow rate (lbm/s)")
+    plt.ylabel("TSFC (TOC)")
+    plt.legend()
+    # plt.show()
+    fname = "TSFC_N3-compare"
+    plt.savefig("plots/" + fname + ".pdf")
+    plt.savefig("plots/" + fname + ".png")
+
+
 if __name__ == "__main__":
     niceplots.setRCParams()
     niceColors = niceplots.get_niceColors()
-    plt.rcParams["font.size"] = 15
+    plt.rcParams["font.size"] = 20
 
-    vert_bar("../OUTPUT/N3_trends/")
+    plot_TSFC_wfrac("../OUTPUT/N3_trends/N3_wfrac_H2_05_TOC.pkl")
+    # plot_TSFC_wfrac("../OUTPUT/N3_trends/N3_wfrac_JetA_10_TOC.pkl")
+    # plot_TSFC_wfrac("../OUTPUT/N3_trends/N3_wfrac_JetA_29_CRZ.pkl")
+    # plot_TSFC_compare("../OUTPUT/N3_trends/N3_wfrac_JetA_08_TOC.pkl", "../OUTPUT/N3_trends/w_inject_JetA.pkl")
+    # plot_TSFC_wfrac("../OUTPUT/N3_trends/w_inject_JetA.pkl")
+    # plot_TSFC_wfrac("../OUTPUT/N3_trends/w_inject_JetA-3400.0_wAREA_HPC53.pkl")
+
+    # vert_bar("../OUTPUT/N3_trends/")
 
     # bar_traj(
     #     file2="../OUTPUT/N3_trends/N3_JetA_wet-air0.pkl",

@@ -28,7 +28,7 @@ from N3_vapor_rec import N3, viewer, MPN3
 def N3_MDP_Opt_model(output_dir, save_res=True):
 
     prob = om.Problem()
-    prob.model = MPN3(use_h2=False, wet_air=True)  # order_add=["bal"]
+    prob.model = MPN3(use_h2=True, wet_air=True)  # order_add=["bal"]
 
     # prob.model.pyc_add_cycle_param("ext_ratio.core_Cv", 0.9999)
     # prob.model.pyc_add_cycle_param("ext_ratio.byp_Cv", 0.9975)
@@ -79,7 +79,7 @@ def N3_MDP_Opt_model(output_dir, save_res=True):
     prob.driver.opt_settings["Penalty parameter"] = 1.0
     prob.driver.opt_settings["Major step limit"] = 0.1
 
-    modelname = "CLVR"
+    modelname = "CLVR_H2"
 
     if save_res is True:
         if os.path.isdir(output_dir) is False:
@@ -104,10 +104,10 @@ def N3_MDP_Opt_model(output_dir, save_res=True):
     # prob.model.add_design_var("bal.rhs:TOC_BPR", lower=1.35, upper=1.45, ref0=1.35, ref=1.45)
     # prob.model.add_design_var("TOC.splitter.BPR", lower=20, upper=30, ref0=20, ref=30)
     # prob.model.add_design_var("CRZ.extract.sub_flow.w_frac", lower=0.0001, upper=0.12)
-    prob.model.add_design_var("TOC.extract.sub_flow.w_frac", lower=0.0, upper=0.12, ref0=0.0, ref=0.12)
-    prob.model.add_design_var("RTO.extract.sub_flow.w_frac", lower=0.0, upper=0.06, ref0=0.0, ref=0.06)
-    prob.model.add_design_var("SLS.extract.sub_flow.w_frac", lower=0.0, upper=0.06, ref0=0.0, ref=0.06)
-    prob.model.add_design_var("CRZ.extract.sub_flow.w_frac", lower=0.0, upper=0.29, ref0=0.0, ref=0.29)
+    prob.model.add_design_var("TOC.extract.sub_flow.w_frac", lower=0.0, upper=0.075, ref0=0.0, ref=0.075)
+    # prob.model.add_design_var("RTO.extract.sub_flow.w_frac", lower=0.00001, upper=0.06, ref0=0.00001, ref=0.06)
+    # prob.model.add_design_var("SLS.extract.sub_flow.w_frac", lower=0.00001, upper=0.06, ref0=0.00001, ref=0.06)
+    prob.model.add_design_var("CRZ.extract.sub_flow.w_frac", lower=0.0, upper=0.15, ref0=0.0, ref=0.15)
     # prob.model.add_design_var("T4_ratio.TR", lower=0.5, upper=0.95, ref0=0.5, ref=0.95)
 
     # ==============================================================================
@@ -122,6 +122,7 @@ def N3_MDP_Opt_model(output_dir, save_res=True):
     # ==============================================================================
     prob.model.add_objective("CRZ.perf.TSFC", ref0=0.4, ref=0.5)
     # prob.model.add_objective("TOC.perf.TSFC", ref0=0.4, ref=0.5)
+    # prob.model.add_objective("TOC.perf.Wfuel", ref0=0.3, ref=0.5)
 
     prob.model.set_input_defaults("RTO_T4", 3400.0, units="degR")
 
@@ -130,7 +131,7 @@ def N3_MDP_Opt_model(output_dir, save_res=True):
 
 if __name__ == "__main__":
     save_res = True
-    output_dir = "../OUTPUT/N3_opt/CLVR/wfrac_all_CRZ"
+    output_dir = "../OUTPUT/N3_opt/CLVR/TSFC/N3_wfrac_H2_CRZ"
     prob = N3_MDP_Opt_model(output_dir, save_res)
 
     prob.setup()
@@ -152,33 +153,51 @@ if __name__ == "__main__":
     prob.set_val("RTO.hpt_cooling.x_factor", 0.9)
 
     # Set inital guesses for balances
-    prob["TOC.balance.FAR"] = 0.02650
-    # prob["bal.TOC_W"] = 820.44097898
-    prob["TOC.balance.lpt_PR"] = 10.937
-    prob["TOC.balance.hpt_PR"] = 4.185
-    prob["TOC.fc.balance.Pt"] = 5.272
-    prob["TOC.fc.balance.Tt"] = 444.41
-    prob["TOC.inject.mix:W"] = 0.01
-    prob["TOC.extract.sub_flow.w_frac"] = 0.08
-    prob["CRZ.extract.sub_flow.w_frac"] = 0.20
+    prob["TOC.extract.sub_flow.w_frac"] = 0.05
+    prob["CRZ.extract.sub_flow.w_frac"] = 0.0
     prob["RTO.extract.sub_flow.w_frac"] = 0.0
     prob["SLS.extract.sub_flow.w_frac"] = 0.0
 
-    FAR_guess = [0.02832, 0.02541, 0.02510]
-    W_guess = [1916.13, 1900.0, 802.79]
-    BPR_guess = [25.5620, 22.3467, 24.3233]
-    fan_Nmech_guess = [2132.6, 1953.1, 2118.7]
-    lp_Nmech_guess = [6611.2, 6054.5, 6567.9]
-    hp_Nmech_guess = [22288.2, 21594.0, 20574.1]
+    prob["TOC.balance.FAR"] = 0.0102
+    prob["TOC.balance.lpt_PR"] = 9.8
+    prob["TOC.balance.hpt_PR"] = 4.2
+    prob["TOC.fc.balance.Pt"] = 5.2
+    prob["TOC.fc.balance.Tt"] = 444.3
+    prob["TOC.inject.mix:W"] = 0.0
+    prob["TOC.fc.balance.Pt"] = 5.272
+    prob["TOC.fc.balance.Tt"] = 444.41
+
+    FAR_guess = [0.0106, 0.02541, 0.0094]
+    W_guess = [1906.3, 1900.4, 797.5]
+    BPR_guess = [26.1, 22.3467, 24.8]
+    fan_Nmech_guess = [2119.9, 1953.1, 2095.7]
+    lp_Nmech_guess = [6572.0, 6054.5, 6496.8]
+    hp_Nmech_guess = [22150.0, 21594.0, 20431.0]
+    hpt_PR_guess = [4.2, 4.245, 4.2]
+    lpt_PR_guess = [8.0, 7.001, 9.9]
     Pt_guess = [15.349, 14.696, 5.272]
     Tt_guess = [552.49, 545.67, 444.41]
-    hpt_PR_guess = [4.210, 4.245, 4.197]
-    lpt_PR_guess = [8.161, 7.001, 10.803]
     fan_Rline_guess = [1.7500, 1.7500, 1.9397]
-    lpc_Rline_guess = [2.0052, 1.8632, 2.1075]
-    hpc_Rline_guess = [2.0589, 2.0281, 1.9746]
-    trq_guess = [52509.1, 41779.4, 22369.7]
-    w_inject = [0.0000, 0.0000, 0.01]
+    lpc_Rline_guess = [1.9, 1.8632, 2.0]
+    hpc_Rline_guess = [2.0, 2.0281, 1.9]
+    trq_guess = [52047.8, 41779.4, 21780.5]
+    w_inject = [0.0000, 0.0000, 0.0000]
+
+    # FAR_guess = [0.0106, 0.0095, 0.0094]
+    # W_guess = [1906.3, 1728.4, 797.5]
+    # BPR_guess = [26.1, 28.0, 24.8]
+    # fan_Nmech_guess = [2119.9, 1945.5, 2095.7]
+    # lp_Nmech_guess = [6572.0, 6031.3, 6496.8]
+    # hp_Nmech_guess = [22150.0, 21462.8, 20431.0]
+    # hpt_PR_guess = [4.2, 4.3, 4.2]
+    # lpt_PR_guess = [8.0, 7.0, 9.9]
+    # Pt_guess = [15.349, 14.696, 5.272]
+    # Tt_guess = [552.49, 545.67, 444.41]
+    # fan_Rline_guess = [1.7500, 1.7500, 1.9397]
+    # lpc_Rline_guess = [1.9, 1.7, 2.0]
+    # hpc_Rline_guess = [2.0, 2.0, 1.9]
+    # trq_guess = [52047.8, 41530.5, 21780.5]
+    # w_inject = [0.0000, 0.0000, 0.0000]
 
     for i, pt in enumerate(prob.model.od_pts):
 

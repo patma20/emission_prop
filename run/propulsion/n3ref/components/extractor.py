@@ -43,7 +43,7 @@ class ThermoSub(om.ExplicitComponent):
         self.add_input("w_frac", val=0.1, desc="fraction of water from incoming flow to extract")
 
         # outputs
-        self.add_output("Wout", shape=1, units="lbm/s", desc="main massflow out")
+        self.add_output("Wout", shape=1, units="lbm/s", desc="main massflow out")  # add initial vals
         self.add_output("W_water", shape=1, units="lbm/s", desc="water massflow out")
         self.add_output("composition_water", val=inflow_thermo.b0)
         self.add_output("composition_out", val=inflow_thermo.b0)
