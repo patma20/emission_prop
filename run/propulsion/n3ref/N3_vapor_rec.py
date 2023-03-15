@@ -508,6 +508,8 @@ class MPN3(pyc.MPCycle):
         use_h2 = self.options["use_h2"]
         wet_air = self.options["wet_air"]
 
+        # alt_war = 0.0  # water-air ratio of atmosphere
+        # sls_war = 0.0  # water-air ratio of atmosphere
         alt_war = 0.001  # water-air ratio of atmosphere
         sls_war = 0.007  # water-air ratio of atmosphere
 
@@ -733,7 +735,7 @@ class MPN3(pyc.MPCycle):
         newton.options["maxiter"] = 10
         newton.options["solve_subsystems"] = True
         newton.options["max_sub_solves"] = 10
-        newton.options["err_on_non_converge"] = True
+        newton.options["err_on_non_converge"] = False
         newton.options["reraise_child_analysiserror"] = False
         newton.linesearch = om.BoundsEnforceLS()
         newton.linesearch.options["bound_enforcement"] = "scalar"
@@ -744,11 +746,11 @@ class MPN3(pyc.MPCycle):
         super().setup()
 
 
-def N3ref_model():
+def N3ref_model(use_h2=False, wet_air=True):
 
     prob = om.Problem()
 
-    prob.model = MPN3(use_h2=True, wet_air=True)
+    prob.model = MPN3(use_h2=use_h2, wet_air=wet_air)
 
     # setup the optimization
     prob.driver = om.ScipyOptimizeDriver()
@@ -881,35 +883,105 @@ if __name__ == "__main__":
     prob.set_solver_print(level=-1)
     prob.set_solver_print(level=2, depth=1)
 
-    check_cons_mass = True
+    check_cons_mass = False
     run_sweep = False
-    save_res = False
-    print_outputs = True
+    save_res = True
+    print_outputs = False
 
     if run_sweep:
-        n = 3
-        w_frac = np.linspace(0.05, 0.075, n)
+        point = "CRZ"
+        n = 10
+        # w_frac = np.linspace(0.0, 0.07, n) # H2 TOC
+        # w_frac = np.linspace(0, 0.05, n) # H2 RTO
+        # w_frac = np.linspace(0, 0.05, n) # H2 SLS
+        # w_frac = np.linspace(0, 0.10, n) # H2 CRZ
+        # w_frac = np.linspace(0, 0.10, n)  # JetA TOC
+        w_frac = np.linspace(0, 0.10, n)  # JetA CRZ
         TSFC_CRZ = np.zeros(n)
         TSFC_TOC = np.zeros(n)
+        TSFC_RTO = np.zeros(n)
+        TSFC_SLS = np.zeros(n)
+        TSEC_CRZ = np.zeros(n)
+        TSEC_TOC = np.zeros(n)
+        TSEC_RTO = np.zeros(n)
+        TSEC_SLS = np.zeros(n)
+        NOx_CRZ = np.zeros(n)
+        NOx_TOC = np.zeros(n)
+        NOx_RTO = np.zeros(n)
+        NOx_SLS = np.zeros(n)
         Wwater = np.zeros(n)
 
         for i, w in enumerate(w_frac):
             print(f"### Running W_frac={w}, Iteration: {i+1} ###")
-            prob["TOC.extract.sub_flow.w_frac"] = w
-            prob["RTO.extract.sub_flow.w_frac"] = 0.0
-            prob["SLS.extract.sub_flow.w_frac"] = 0.0
-            prob["CRZ.extract.sub_flow.w_frac"] = 0.0
-            # prob["CRZ.extract.sub_flow.w_frac"] = w
-            # prob["CRZ.extract.sub_flow.w_frac"] = w
+            if point == "TOC":
+                prob["TOC.extract.sub_flow.w_frac"] = w
+            else:
+                prob["TOC.extract.sub_flow.w_frac"] = 0.0
+            if point == "RTO":
+                prob["RTO.extract.sub_flow.w_frac"] = w
+            else:
+                prob["RTO.extract.sub_flow.w_frac"] = 0.0
+            if point == "SLS":
+                prob["SLS.extract.sub_flow.w_frac"] = w
+            else:
+                prob["SLS.extract.sub_flow.w_frac"] = 0.0
+            if point == "CRZ":
+                prob["CRZ.extract.sub_flow.w_frac"] = w
+            else:
+                prob["CRZ.extract.sub_flow.w_frac"] = 0.0
+
             prob.run_model()
+
             TSFC_CRZ[i] = prob.get_val("CRZ.perf.TSFC")
             TSFC_TOC[i] = prob.get_val("TOC.perf.TSFC")
-            Wwater[i] = prob.get_val("TOC.inject.mix:W")
+            TSFC_RTO[i] = prob.get_val("RTO.perf.TSFC")
+            TSFC_SLS[i] = prob.get_val("SLS.perf.TSFC")
+            TSEC_CRZ[i] = prob.get_val("CRZ.tsec_perf.TSEC")
+            TSEC_TOC[i] = prob.get_val("TOC.tsec_perf.TSEC")
+            TSEC_RTO[i] = prob.get_val("RTO.tsec_perf.TSEC")
+            TSEC_SLS[i] = prob.get_val("SLS.tsec_perf.TSEC")
+            NOx_TOC[i] = prob.get_val("TOC_EINOx.EINOx_OD")
+            NOx_RTO[i] = prob.get_val("RTO_EINOx.EINOx_OD")
+            NOx_SLS[i] = prob.get_val("TOC_EINOx.EINOx_SLS")
+            NOx_CRZ[i] = prob.get_val("CRZ_EINOx.EINOx_OD")
+            Wwater[i] = prob.get_val(point + ".inject.mix:W")
 
-        fname = "../OUTPUT/N3_trends/N3_wfrac_H2_05-08_TOC.pkl"
-        # fname = "../OUTPUT/N3_trends/N3_wfrac_JetA_10_TOC.pkl"
+        if point == "TOC":
+            # fname = "../OUTPUT/N3_trends/N3_wfrac_H2_0-7_TOC.pkl"
+            fname = "../OUTPUT/N3_trends/N3_wfrac_JetA_0-10_TOC.pkl"
+        elif point == "RTO":
+            fname = "../OUTPUT/N3_trends/N3_wfrac_H2_0-5_RTO.pkl"
+        elif point == "SLS":
+            fname = "../OUTPUT/N3_trends/N3_wfrac_H2_0-5_SLS.pkl"
+        elif point == "CRZ":
+            # fname = "../OUTPUT/N3_trends/N3_wfrac_H2_0-10_CRZ.pkl"
+            fname = "../OUTPUT/N3_trends/N3_wfrac_JetA_0-10_CRZ.pkl"
+        else:
+            pass
+        # fname = "../OUTPUT/N3_trends/N3_wfrac_JetA_0-10_TOC.pkl"
+        # fname = "../OUTPUT/N3_trends/N3_wfrac_JetA_0-27_CRZ.pkl"
         with open(fname, "wb") as f:
-            pkl.dump(np.vstack((w_frac, Wwater, TSFC_CRZ, TSFC_TOC)), f)
+            pkl.dump(
+                np.vstack(
+                    (
+                        w_frac,
+                        Wwater,
+                        TSFC_TOC,
+                        TSFC_RTO,
+                        TSFC_SLS,
+                        TSFC_CRZ,
+                        TSEC_TOC,
+                        TSEC_RTO,
+                        TSEC_SLS,
+                        TSEC_CRZ,
+                        NOx_TOC,
+                        NOx_RTO,
+                        NOx_SLS,
+                        NOx_CRZ,
+                    )
+                ),
+                f,
+            )
     else:
         wfrac = 0.0000
         prob.set_val("TOC.extract.sub_flow.w_frac", wfrac)
@@ -957,7 +1029,7 @@ if __name__ == "__main__":
                 print(prob[pt + ".inject.mix:W"])
 
         if save_res is True:
-            output_dir = f"../OUTPUT/N3_output/CLVR_{wfrac}"
+            output_dir = f"../OUTPUT/N3_output/CLVR_JetA_{wfrac}"
             if os.path.isdir(output_dir) is False:
                 os.mkdir(output_dir)
             with open(f"{output_dir}/output.txt", "w") as file:
@@ -1015,73 +1087,3 @@ if __name__ == "__main__":
                 print("Water loop mass flow check (mdot_in - mdot_out): ", extract_water - inject_water)
 
     print("time", time.time() - st)
-
-    # FAR_guess = [0.01060631, 0.00952807, 0.00942863]
-    # W_guess = [1906.38417587, 1728.43191666, 797.50729153]
-    # BPR_guess = [26.10876844, 28.0348248, 24.86901046]
-    # fan_Nmech_guess = [2119.99434504, 1945.57180666, 2095.74560509]
-    # lp_Nmech_guess = [6572.03099319, 6031.31713194, 6496.85934433]
-    # hp_Nmech_guess = [22150.04207581, 21462.82896983, 20431.08203631]
-    # hpt_PR_guess = [4.26770004, 4.30696236, 4.26332924]
-    # lpt_PR_guess = [8.05410041, 7.03976072, 9.91209521]
-    # fan_Rline_guess = [1.7500, 1.7500, 1.9397]
-    # lpc_Rline_guess = [1.93901551, 1.78563311, 2.05679571]
-    # hpc_Rline_guess = [2.03522272, 2.00229121, 1.94122564]
-    # trq_guess = [52047.86253509, 41530.55101615, 21780.53908646]
-
-    # TOC
-
-    # [0.01058445]
-    # [8.83640269]
-    # [3.68548432]
-    # [5.27241356]
-    # [444.38571023]
-    # [5.53875858e-17]
-
-    # RTO
-
-    # [0.0107268]
-    # [1898.94366506]
-    # [26.33123016]
-    # [2108.88732994]
-    # [6537.59899216]
-    # [22068.75118865]
-    # [3.70799239]
-    # [7.6900684]
-    # [1.75]
-    # [1.89954133]
-    # [2.02907959]
-    # [51479.19974723]
-    # [1.73452819e-18]
-
-    # SLS
-
-    # [0.00963605]
-    # [1724.36608166]
-    # [28.3085683]
-    # [1939.29838741]
-    # [6011.86938866]
-    # [21404.78271756]
-    # [3.74159721]
-    # [6.83258971]
-    # [1.75]
-    # [1.74711975]
-    # [2.01981525]
-    # [41199.46728224]
-    # [0.]
-
-    # CRZ
-
-    # [0.00957495]
-    # [793.17464512]
-    # [25.15241235]
-    # [2075.03336372]
-    # [6432.65092199]
-    # [20322.76338571]
-    # [3.70448951]
-    # [8.87189997]
-    # [1.9397]
-    # [2.02177795]
-    # [1.93450893]
-    # [21243.23457868]
-    # [5.60170296e-17]

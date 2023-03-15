@@ -176,7 +176,7 @@ class P3T3(om.ExplicitComponent):
             -(EINOx_SLS * n * ((P3_OD / P3_SLS) ** n) * ((FAR_OD / FAR_SLS) ** m) * np.exp(H)) / P3_SLS
         )
 
-        partials["EINOx_OD", "EINOx_SLS"] = ((P3_OD / P3_SLS) ** n) * ((FAR_OD / FAR_SLS) ** m)
+        partials["EINOx_OD", "EINOx_SLS"] = ((P3_OD / P3_SLS) ** n) * ((FAR_OD / FAR_SLS) ** m) * np.exp(H)
 
         partials["EINOx_OD", "FAR_OD"] = (
             EINOx_SLS * m * ((P3_OD / P3_SLS) ** n) * ((FAR_OD / FAR_SLS) ** m) * np.exp(H)

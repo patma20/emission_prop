@@ -103,11 +103,10 @@ def N3_MDP_Opt_model(output_dir, save_res=True):
     # prob.model.add_design_var("RTO_T4", lower=3000.0, upper=3600.0, ref0=3000.0, ref=3600.0)
     # prob.model.add_design_var("bal.rhs:TOC_BPR", lower=1.35, upper=1.45, ref0=1.35, ref=1.45)
     # prob.model.add_design_var("TOC.splitter.BPR", lower=20, upper=30, ref0=20, ref=30)
-    # prob.model.add_design_var("CRZ.extract.sub_flow.w_frac", lower=0.0001, upper=0.12)
-    prob.model.add_design_var("TOC.extract.sub_flow.w_frac", lower=0.0, upper=0.075, ref0=0.0, ref=0.075)
-    # prob.model.add_design_var("RTO.extract.sub_flow.w_frac", lower=0.00001, upper=0.06, ref0=0.00001, ref=0.06)
-    # prob.model.add_design_var("SLS.extract.sub_flow.w_frac", lower=0.00001, upper=0.06, ref0=0.00001, ref=0.06)
-    prob.model.add_design_var("CRZ.extract.sub_flow.w_frac", lower=0.0, upper=0.15, ref0=0.0, ref=0.15)
+    prob.model.add_design_var("TOC.extract.sub_flow.w_frac", lower=0.0, upper=0.15, ref0=0.0, ref=0.15)
+    prob.model.add_design_var("RTO.extract.sub_flow.w_frac", lower=0.0, upper=0.06, ref0=0.0, ref=0.06)
+    prob.model.add_design_var("SLS.extract.sub_flow.w_frac", lower=0.0, upper=0.06, ref0=0.0, ref=0.06)
+    prob.model.add_design_var("CRZ.extract.sub_flow.w_frac", lower=0.0, upper=0.19, ref0=0.0, ref=0.19)
     # prob.model.add_design_var("T4_ratio.TR", lower=0.5, upper=0.95, ref0=0.5, ref=0.95)
 
     # ==============================================================================
@@ -120,9 +119,10 @@ def N3_MDP_Opt_model(output_dir, save_res=True):
     # ==============================================================================
     # Objective
     # ==============================================================================
-    prob.model.add_objective("CRZ.perf.TSFC", ref0=0.4, ref=0.5)
+    # prob.model.add_objective("CRZ.tsec_perf.TSEC", ref0=7500, ref=8000)
+    prob.model.add_objective("CRZ.perf.TSFC", ref0=0.16, ref=0.2)
     # prob.model.add_objective("TOC.perf.TSFC", ref0=0.4, ref=0.5)
-    # prob.model.add_objective("TOC.perf.Wfuel", ref0=0.3, ref=0.5)
+    # prob.model.add_objective("CRZ.burner.Wfuel", ref0=0.3, ref=0.5)
 
     prob.model.set_input_defaults("RTO_T4", 3400.0, units="degR")
 
@@ -130,8 +130,10 @@ def N3_MDP_Opt_model(output_dir, save_res=True):
 
 
 if __name__ == "__main__":
-    save_res = True
+    save_res = False
     output_dir = "../OUTPUT/N3_opt/CLVR/TSFC/N3_wfrac_H2_CRZ"
+    # output_dir = "../OUTPUT/N3_opt/CLVR/TSEC/N3_wfrac_H2_CRZ"
+    # output_dir = "../OUTPUT/N3_opt/CLVR/Wfuel/N3_wfrac_H2_CRZ"
     prob = N3_MDP_Opt_model(output_dir, save_res)
 
     prob.setup()
@@ -221,12 +223,12 @@ if __name__ == "__main__":
     st = time.time()
 
     # N2 generation
-    # om.n2(prob)
+    om.n2(prob)
 
     prob.set_solver_print(level=-1)
     prob.set_solver_print(level=2, depth=1)
     # prob.run_model()
-    # prob.check_partials(compact_print=True, show_only_incorrect=False, method="fd")
+    # prob.check_partials(compact_print=True, show_only_incorrect=True, method="fd")
     # prob.check_totals(
     #     of=["CRZ.NOx.EINOx"],
     #     # wrt=["CRZ.NOx.P3", "CRZ.NOx.T3", "CRZ.NOx.T4"],
@@ -237,7 +239,7 @@ if __name__ == "__main__":
     #     step_calc="rel_avg",
     # )
 
-    prob.run_driver()
+    # prob.run_driver()
 
     # for pt in ["TOC"] + prob.model.od_pts:
     #     viewer(prob, pt)
@@ -250,7 +252,7 @@ if __name__ == "__main__":
             prob.model.list_inputs(prom_name=True, units=True, out_stream=file)
 
         with open(f"{output_dir}/output.txt", "w") as file:
-            for pt in ["TOC"]:
+            for pt in ["TOC"] + prob.model.od_pts:
                 viewer(prob, pt, file)
 
             print(file=file, flush=True)
