@@ -42,8 +42,8 @@ class HistoryPlotter:
 
     def plot_opt_summary(
         self,
-        opt_tol=1e-8,
-        feas_tol=1e-8,
+        opt_tol=1e-6,
+        feas_tol=1e-6,
         colors=[NICE_COLORS["Red"], NICE_COLORS["Blue"], NICE_COLORS["Green"]],
         **kwargs,
     ):
@@ -237,14 +237,12 @@ class HistoryPlotter:
 
 
 if __name__ == "__main__":
-    hist_path = "../OUTPUT/N3_opt/history_P3T3T4.out"
-    # hist_path = "../OUTPUT/N3_opt_1kgs_50kW_full/history_50_BPR300.out"
-    out_path = "../../../postprocessing/P3T3T4/"
-    # out_path = "../../../postprocessing/N3_opt_50/"
+    hist_path = "../OUTPUT/N3_opt/CLVR/TSFC/N3_wfrac_H2_CRZ/history_CLVR_H2.out"
+    # hist_path = "../OUTPUT/N3_opt/CLVR/TSFC/N3_wfrac_JetA_CRZ/history_CLVR.out"
+    out_path = "../../../postprocessing/CLVR_H2/"
+    # out_path = "../../../postprocessing/CLVR_JetA/"
     if os.path.isdir(out_path) is False:
         os.mkdir(out_path)
-    # out_path = "../../../postprocessing/N3opt_20kW/"
-    # os.mkdir(out_path)
     plotter = HistoryPlotter(hist_path, out_path)
     plotter.plot_opt_summary(marker=".", markersize=6.0)
     plotter.plot_dvs(marker=".", markersize=6.0)

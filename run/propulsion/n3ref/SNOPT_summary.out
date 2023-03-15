@@ -12,35 +12,12 @@
 
 
 
- Nonlinear constraints       2     Linear constraints       0
- Nonlinear variables         6     Linear variables         0
- Jacobian  variables         6     Objective variables      6
- Total constraints           2     Total variables          6
+ Nonlinear constraints       1     Linear constraints       0
+ Nonlinear variables         4     Linear variables         0
+ Jacobian  variables         4     Objective variables      4
+ Total constraints           1     Total variables          4
 
 
 
- The user has defined      12   out of      12   constraint gradients.
- The user has defined       6   out of       6   objective  gradients.
-
- SNOPTC EXIT  50 -- error in the user-supplied functions
- SNOPTC INFO  52 -- incorrect constraint derivatives
-
- Problem name                 Optimiza
- No. of iterations                   0   Objective            3.9050814758E-01
- No. of major iterations             0   Linear    obj. term  0.0000000000E+00
- Penalty parameter          -1.111E+04   Nonlinear obj. term  3.9050814758E-01
- User function calls (total)         8
- No. of degenerate steps             0   Percentage                       0.00
- Max x                       2 3.0E+00   Max pi                      1 0.0E+00
- Max Primal infeas           7 2.1E-02   Max Dual infeas             6 7.1E-01
- Nonlinear constraint violn    2.1E-02
-
-
-
- Solution printed on file  18
-
- Time for MPS input                             0.00 seconds
- Time for solving problem                     118.50 seconds
- Time for solution output                       0.00 seconds
- Time for constraint functions                118.50 seconds
- Time for objective function                    0.00 seconds
+ The user has defined       2   out of       2   constraint gradients.
+ The user has defined       4   out of       4   objective  gradients.

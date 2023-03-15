@@ -4,10 +4,10 @@
          ==============================
       LU complete pivoting
       Hessian full memory
-      Major feasibility tolerance  1.00000000E-08
-      Major optimality tolerance  1.00000000E-08
+      Major feasibility tolerance  1.00000000E-06
+      Major optimality tolerance  1.00000000E-06
       Penalty parameter  1.00000000E+00
-      Verify level               3
+      Major step limit  1.00000000E-01
       Derivative level               3
 1
 
@@ -19,10 +19,10 @@
          ==============================
       LU complete pivoting
       Hessian full memory
-      Major feasibility tolerance  1.00000000E-08
-      Major optimality tolerance  1.00000000E-08
+      Major feasibility tolerance  1.00000000E-06
+      Major optimality tolerance  1.00000000E-06
       Penalty parameter  1.00000000E+00
-      Verify level               3
+      Major step limit  1.00000000E-01
       Derivative level               3
 1
 
@@ -45,23 +45,23 @@
  --------------
  QPsolver Cholesky......
  Scale tolerance........     0.900       Minor feasibility tol..  1.00E-06       Iteration limit........     10000
- Scale option...........         0       Minor optimality  tol..  5.00E-09       Minor print level......         1
+ Scale option...........         0       Minor optimality  tol..  5.00E-07       Minor print level......         1
  Crash tolerance........     0.100       Pivot tolerance........  3.25E-11       New superbasics........        99
  Crash option...........         3       Elastic weight.........  1.00E+05
 
  Partial pricing
  ---------------
- LP Partial price.......         1       Prtl price section ( A)         6       Prtl price section (-I)         2
- QP Partial price.......         1       Prtl price section ( A)         6       Prtl price section (-I)         2
+ LP Partial price.......         1       Prtl price section ( A)         4       Prtl price section (-I)         1
+ QP Partial price.......         1       Prtl price section ( A)         4       Prtl price section (-I)         1
 
  The SQP Method
  --------------
  Minimize...............                 Cold start.............                 Proximal Point method..         1
- Nonlinear objectiv vars         6       Major optimality tol...  1.00E-08       Function precision.....  3.00E-13
- Unbounded step size....  1.00E+20       Superbasics limit......         6       Difference interval....  5.48E-07
- Unbounded objective....  1.00E+10       Reduced Hessian dim....         6       Central difference int.  6.70E-05
- Major step limit.......  2.00E+00       Derivative linesearch..                 Derivative level.......         3
- Major iterations limit.      1000       Linesearch tolerance...   0.90000       Verify level...........         3
+ Nonlinear objectiv vars         4       Major optimality tol...  1.00E-06       Function precision.....  3.00E-13
+ Unbounded step size....  1.00E+20       Superbasics limit......         4       Difference interval....  5.48E-07
+ Unbounded objective....  1.00E+10       Reduced Hessian dim....         4       Central difference int.  6.70E-05
+ Major step limit.......  1.00E-01       Derivative linesearch..                 Derivative level.......         3
+ Major iterations limit.      1000       Linesearch tolerance...   0.90000       Verify level...........         0
  Minor iterations limit.       500       Penalty parameter......  1.00E+00       Major Print Level......         1
  Time limit (secs)...... 9999999.0
 
@@ -72,8 +72,8 @@
 
  Nonlinear constraints
  ---------------------
- Nonlinear constraints..         2       Major feasibility tol..  1.00E-08       Violation limit........  1.00E+06
- Nonlinear Jacobian vars         6
+ Nonlinear constraints..         1       Major feasibility tol..  1.00E-06       Violation limit........  1.00E+06
+ Nonlinear Jacobian vars         4
 
  Miscellaneous
  -------------
@@ -89,120 +89,24 @@
  Matrix statistics
  -----------------
                Total      Normal        Free       Fixed     Bounded
- Rows              2           2           0           0           0
- Columns           6           0           0           0           6
+ Rows              1           1           0           0           0
+ Columns           4           0           0           0           4
 
- No. of matrix elements                   12     Density     100.000
+ No. of matrix elements                    2     Density      50.000
  Biggest  constant element        0.0000E+00  (excluding fixed columns,
  Smallest constant element        0.0000E+00   free rows, and RHS)
 
  No. of objective coefficients             0
 
- Nonlinear constraints       2     Linear constraints       0
- Nonlinear variables         6     Linear variables         0
- Jacobian  variables         6     Objective variables      6
- Total constraints           2     Total variables          6
+ Nonlinear constraints       1     Linear constraints       0
+ Nonlinear variables         4     Linear variables         0
+ Jacobian  variables         4     Objective variables      4
+ Total constraints           1     Total variables          4
 1
 
 
 
- The user has defined      12   out of      12   constraint gradients.
- The user has defined       6   out of       6   objective  gradients.
+ The user has defined       2   out of       2   constraint gradients.
+ The user has defined       4   out of       4   objective  gradients.
 
- Verification of user-supplied problem derivatives.
-
- The constraint gradients seem to be OK.
-
- -->  The largest discrepancy was    4.90E-07  in constraint     8
-
-
- The objective  gradients seem to be OK.
-
- Gradient projected in one direction   1.10959230449E-01
- Difference approximation              1.10965759515E-01
-
-
- Column       x(j)        dx(j)    Element no.    Row        Derivative    Difference approxn
-
-      1  1.30000000E+00  1.26E-06         1         1   -1.17559168E+00   -1.17558953E+00  ok
-                                          2         2    7.48568802E-01    7.48565079E-01  ok
-      1  1.30000000E+00  1.26E-06           Objective    7.40757076E-02    7.40869084E-02  ok
-
-      2  3.00000000E+00  2.19E-06         3         1    9.61731995E-03    9.61689754E-03  ok
-                                          4         2    1.73727725E-02    1.73713175E-02  ok
-      2  3.00000000E+00  2.19E-06           Objective    1.90660734E-02    1.90891405E-02  ok
-
-      3  5.00000000E-01  8.22E-07         5         1   -4.99040076E-03   -4.99212316E-03  ok
-                                          6         2    4.72905497E-03    4.72792726E-03  ok
-      3  5.00000000E-01  8.22E-07           Objective   -6.55776085E-02   -6.55778261E-02  ok
-
-      4  6.66666667E-01  9.13E-07         7         1   -1.42603275E-03   -4.49291085E-03  bad?
-                                          8         2   -2.53583747E-02    4.25513454E-03  bad?
-      4  6.66666667E-01  9.13E-07           Objective    5.14824388E-02   -5.90200435E-02  bad?
-
-      5  5.00000000E-01  8.22E-07         9         1   -1.23529487E-02   -4.99212316E-03  bad?
-                                         10         2   -3.91394490E-03    4.72792726E-03  bad?
-      5  5.00000000E-01  8.22E-07           Objective    2.17146697E-02   -6.55778261E-02  bad?
-
-      6  9.47712418E-01  1.07E-06        11         1    7.33152933E-01   -3.84460492E-03  bad?
-                                         12         2    1.38494843E+00    3.64113861E-03  bad?
-      6  9.47712418E-01  1.07E-06           Objective   -7.06124254E-01   -5.05037285E-02  bad?
-
- XXX  There seem to be     6  incorrect Jacobian elements in cols     1  thru     6
-
- -->  The largest relative error was    1.38E+00   in row     2,  column     6
-
-
- XXX  There seem to be     3  incorrect objective gradients in cols     1  thru     6
-
- -->  The largest relative error was    6.24E-01   in column     6
-
-1
-
- SNOPTC EXIT  50 -- error in the user-supplied functions
- SNOPTC INFO  52 -- incorrect constraint derivatives
-
- Problem name                 Optimiza
- No. of iterations                   0   Objective            3.9050814758E-01
- No. of major iterations             0   Linear    obj. term  0.0000000000E+00
- Penalty parameter          -1.111E+04   Nonlinear obj. term  3.9050814758E-01
- User function calls (total)         8
- No. of degenerate steps             0   Percentage                       0.00
- Max x                       2 3.0E+00   Max pi                      1 0.0E+00
- Max Primal infeas           7 2.1E-02   Max Dual infeas             6 7.1E-01
- Nonlinear constraint violn    2.1E-02
-1
-
- Name           Optimiza                 Objective Value      3.9050814758E-01
-
- Status         Optimal Soln             Iteration      0    Superbasics     0
-
- Objective      -------- (Min)
- RHS            --------
- Ranges         --------
- Bounds         --------
-
- Section 1 - Constraints
-
-  Number  ...Row.. State  ...Value......  Slack Value...  ..Lower Limit.  ..Upper Limit.  .Dual Variable    ..i
-
-       7  r      1 I  BS         1.02102         0.02102           None          1.0              .           1
-       8  r      2    BS         1.04394         0.07728         0.96667           None           .           2
-1
-
- Section 2 - Variables
-
-  Number  .Column. State  ...Value......  .Obj Gradient.  ..Lower Limit.  ..Upper Limit.  .Dual Variable    m+j
-
-       1  x      1 N  FR         1.30000         0.07408         1.20000         1.40000         0.07408      3
-       2  x      2 N  FR         3.00000         0.01907         2.50000         4.00000         0.01907      4
-       3  x      3 N  FR         0.50000        -0.06558          .              1.0            -0.06558      5
-       4  x      4 N  FR         0.66667         0.05148          .              1.0             0.05148      6
-       5  x      5 N  FR         0.50000         0.02171          .              1.0             0.02171      7
-       6  x      6 N  FR         0.94771        -0.70612          .              1.0            -0.70612      8
-
- Time for MPS input                             0.00 seconds
- Time for solving problem                     118.50 seconds
- Time for solution output                       0.00 seconds
- Time for constraint functions                118.50 seconds
- Time for objective function                    0.00 seconds
+ Cheap test of user-supplied problem derivatives...

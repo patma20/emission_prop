@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import niceplots
 import pickle as pkl
 import numpy as np
+import os
 
 
 def plot_NOx():
@@ -377,13 +378,53 @@ def vert_bar(dirpath):
     return
 
 
-def plot_TSFC_wfrac(fname):
+def vert_bar_CLVR(dirpath):
+    niceColours = niceplots.get_niceColors()
+    labels = ["TOC", "RTO", "SLS", "CRZ"]
+
+    TSEC_jw = np.array([8091.83600, 5158.95131, 3108.50255, 7886.58356])
+    TSEC_jd = np.array([8159.47841, 5106.91800, 3094.18795, 8199.00998])
+    TSEC_hw = np.array([8161.40341, 5415.06315, 3250.09278, 7840.04626])
+    TSEC_hd = np.array([8523.68744, 5284.35445, 3202.25020, 8518.99365])
+
+    rel_TSEC_jw = -(TSEC_jw - TSEC_jd) / TSEC_jd * 100
+    rel_TSEC_hw = -(TSEC_hw - TSEC_hd) / TSEC_hd * 100
+    # print(TSEC_jd)
+    # print(TSEC_hd)
+
+    fig, ax = plt.subplots(2, 1, sharex=True, figsize=[12, 8])
+    # fig, ax = plt.subplots()
+    width = 0.5
+
+    ax[0].bar(labels, rel_TSEC_jw, width, label="Jet-A with water recovery", color=niceColours["Yellow"])
+    ax[1].bar(labels, rel_TSEC_hw, width, label=r"$LH_2$ with water recovery", color=niceColours["Blue"])
+    # ax.bar(labels, rel_TSEC_jw, width, label="Jet-A")
+    # ax.bar(labels, rel_TSEC_hw, width, bottom=rel_TSEC_jw, label="LH2")
+
+    ax[0].set_ylabel("Percent Relative\nImprovement in TSEC", rotation="horizontal", ha="right", va="center")
+    ax[1].set_ylabel("Percent Relative\nImprovement in TSEC", rotation="horizontal", ha="right", va="center")
+    # ax.set_ylabel("Relative Difference in TSEC with Water Injection")
+    # ax.set_title("Relative Improvements of Water Injection")
+    ax[0].legend(loc="upper center")
+    ax[1].legend(loc="upper center")
+    # ax.legend()
+    if os.path.isdir(dirpath) is False:
+        os.mkdir(dirpath)
+    plt.savefig(dirpath + "JetA-H2_TSEC_diff.pdf", dpi=400, bbox_inches="tight")
+    plt.savefig(dirpath + "JetA-H2_TSEC_diff.png", dpi=400, bbox_inches="tight")
+
+    # plt.show()
+
+    return
+
+
+def plot_TSFC_wfrac_comb(fname):
     plt.figure(figsize=(14, 10))
 
     with open(fname, "rb") as f:
         data = pkl.load(f)
 
-        with open("../OUTPUT/N3_trends/N3_wfrac_H2_05-08_TOC.pkl", "rb") as f:
+        with open("../OUTPUT/N3_trends/N3_wfrac_H2_0-08_TOC.pkl", "rb") as f:
             data2 = pkl.load(f)
 
             xdata = np.append(data[0], data2[0])
@@ -415,6 +456,88 @@ def plot_TSFC_wfrac(fname):
     # fname = "TSFC_N3-inject-upd"
     plt.savefig("plots/" + fname + ".pdf")
     plt.savefig("plots/" + fname + ".png")
+
+
+def plot_NOx_wfrac(fname):
+    plt.figure(figsize=(18, 6))
+
+    with open(fname, "rb") as f:
+        data = pkl.load(f)
+
+        xdata = data[0]
+        # xdata = data[1]
+        TOCdata = data[10]
+        RTOdata = data[11]
+        SLSdata = data[12]
+        CRZdata = data[13]
+
+    plt.plot(xdata, (TOCdata - TOCdata[0]) / TOCdata[0] * 100, label="TOC (0% water recovered)", linewidth=5)
+    # plt.plot(xdata, (TOCdata), label="TOC", linewidth=5)
+    plt.plot(xdata, (RTOdata - RTOdata[0]) / RTOdata[0] * 100, label="RTO (0% water recovered)", linewidth=5)
+    # plt.plot(xdata, (RTOdata - RTOdata[0]) / RTOdata[0] * 100, label="RTO", linewidth=5)
+    plt.plot(xdata, (SLSdata - SLSdata[0]) / SLSdata[0] * 100, label="SLS (0% water recovered)", linewidth=5)
+    # plt.plot(xdata, (SLSdata - SLSdata[0]) / SLSdata[0] * 100, label="SLS", linewidth=5)
+    # plt.plot(xdata, (CRZdata), label="CRZ (0% water recovered)", linewidth=5)
+    plt.plot(xdata, (CRZdata - CRZdata[0]) / CRZdata[0] * 100, label="CRZ", linewidth=5)
+
+    # plt.xlabel("Fraction of core exhaust water recovered (TOC)")
+    # plt.xlabel("Fraction of core exhaust water recovered (RTO)")
+    # plt.xlabel("Fraction of core exhaust water recovered (SLS)")
+    plt.xlabel("Fraction of core exhaust water recovered (CRZ)")
+    # plt.xlabel("Water flow rate (lbm/s)")
+    plt.ylabel("EINOx (g/kg)", rotation="horizontal", ha="right", va="center")
+    plt.legend()
+    # plt.show()
+    # fname = "TSEC_N3-CLVR-H2-0-10-TOC"
+    # fname = "TSEC_N3-CLVR-H2-0-5-RTO"
+    # fname = "TSEC_N3-CLVR-H2-0-5-SLS"
+    fname = "TSEC_N3-CLVR-JetA-0-10-CRZ"
+    outdir = "plots/NOx/"
+    if os.path.isdir(outdir) is False:
+        os.mkdir(outdir)
+    plt.savefig(outdir + fname + ".pdf")
+    plt.savefig(outdir + fname + ".png")
+
+
+def plot_TSEC_wfrac(fname):
+    plt.figure(figsize=(18, 6))
+
+    with open(fname, "rb") as f:
+        data = pkl.load(f)
+
+        xdata = data[0]
+        # xdata = data[1]
+        TOCdata = data[6]
+        RTOdata = data[7]
+        SLSdata = data[8]
+        CRZdata = data[9]
+
+    # plt.plot(xdata, (TOCdata - TOCdata[0]) / TOCdata[0] * 100, label="TOC (0% water recovered)", linewidth=5)
+    plt.plot(xdata, (TOCdata - TOCdata[0]) / TOCdata[0] * 100, label="TOC", linewidth=5)
+    plt.plot(xdata, (RTOdata - RTOdata[0]) / RTOdata[0] * 100, label="RTO (0% water recovered)", linewidth=5)
+    # plt.plot(xdata, (RTOdata - RTOdata[0]) / RTOdata[0] * 100, label="RTO", linewidth=5)
+    plt.plot(xdata, (SLSdata - SLSdata[0]) / SLSdata[0] * 100, label="SLS (0% water recovered)", linewidth=5)
+    # plt.plot(xdata, (SLSdata - SLSdata[0]) / SLSdata[0] * 100, label="SLS", linewidth=5)
+    plt.plot(xdata, (CRZdata - CRZdata[0]) / CRZdata[0] * 100, label="CRZ (0% water recovered)", linewidth=5)
+    # plt.plot(xdata, (CRZdata - CRZdata[0]) / CRZdata[0] * 100, label="CRZ", linewidth=5)
+
+    plt.xlabel("Fraction of core exhaust water recovered (TOC)")
+    # plt.xlabel("Fraction of core exhaust water recovered (RTO)")
+    # plt.xlabel("Fraction of core exhaust water recovered (SLS)")
+    # plt.xlabel("Fraction of core exhaust water recovered (CRZ)")
+    # plt.xlabel("Water flow rate (lbm/s)")
+    plt.ylabel("Percent\nDifference TSEC", rotation="horizontal", ha="right", va="center")
+    plt.legend()
+    # plt.show()
+    fname = "TSEC_N3-CLVR-H2-0-7-TOC"
+    # fname = "TSEC_N3-CLVR-H2-0-5-RTO"
+    # fname = "TSEC_N3-CLVR-H2-0-5-SLS"
+    # fname = "TSEC_N3-CLVR-H2-0-10-CRZ"
+    outdir = "plots/TSEC/"
+    if os.path.isdir(outdir) is False:
+        os.mkdir(outdir)
+    plt.savefig(outdir + fname + ".pdf")
+    plt.savefig(outdir + fname + ".png")
 
 
 def plot_TSFC_compare(fname1, fname2):
@@ -457,13 +580,19 @@ if __name__ == "__main__":
     niceColors = niceplots.get_niceColors()
     plt.rcParams["font.size"] = 20
 
-    plot_TSFC_wfrac("../OUTPUT/N3_trends/N3_wfrac_H2_05_TOC.pkl")
+    # plot_TSEC_wfrac("../OUTPUT/N3_trends/N3_wfrac_H2_0-7_TOC.pkl")
+    # plot_TSEC_wfrac("../OUTPUT/N3_trends/N3_wfrac_H2_0-5_RTO.pkl")
+    # plot_TSEC_wfrac("../OUTPUT/N3_trends/N3_wfrac_H2_0-5_SLS.pkl")
+    # plot_TSEC_wfrac("../OUTPUT/N3_trends/N3_wfrac_H2_0-10_CRZ.pkl")
+    # plot_NOx_wfrac("../OUTPUT/N3_trends/N3_wfrac_JetA_0-10_TOC.pkl")
+    # plot_NOx_wfrac("../OUTPUT/N3_trends/N3_wfrac_JetA_0-10_CRZ.pkl")
     # plot_TSFC_wfrac("../OUTPUT/N3_trends/N3_wfrac_JetA_10_TOC.pkl")
     # plot_TSFC_wfrac("../OUTPUT/N3_trends/N3_wfrac_JetA_29_CRZ.pkl")
     # plot_TSFC_compare("../OUTPUT/N3_trends/N3_wfrac_JetA_08_TOC.pkl", "../OUTPUT/N3_trends/w_inject_JetA.pkl")
     # plot_TSFC_wfrac("../OUTPUT/N3_trends/w_inject_JetA.pkl")
     # plot_TSFC_wfrac("../OUTPUT/N3_trends/w_inject_JetA-3400.0_wAREA_HPC53.pkl")
 
+    vert_bar_CLVR("plots/bar_plot/")
     # vert_bar("../OUTPUT/N3_trends/")
 
     # bar_traj(
