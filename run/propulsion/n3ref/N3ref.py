@@ -701,6 +701,8 @@ if __name__ == "__main__":
     prob.set_solver_print(level=-1)
     prob.set_solver_print(level=2, depth=2)
     prob.run_model()
+    prob.check_partials(compact_print=True, show_only_incorrect=True, method="fd")
+
 
     for pt in ["TOC"] + prob.model.od_pts:
         viewer(prob, pt)

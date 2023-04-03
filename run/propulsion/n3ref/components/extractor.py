@@ -40,7 +40,7 @@ class ThermoSub(om.ExplicitComponent):
         self.add_input("Fl_I:stat:W", val=0.0, desc="weight flow", units="lbm/s")
         self.add_input("Fl_I:tot:composition", val=inflow_thermo.b0, desc="incoming flow composition")
         self.add_input("n", val=np.ones(17), shape=17, desc="molar concetration of incoming flow")
-        self.add_input("w_frac", val=0.1, desc="fraction of water from incoming flow to extract")
+        self.add_input("w_frac", val=0.01, desc="fraction of water from incoming flow to extract")
 
         # outputs
         self.add_output("Wout", shape=1, units="lbm/s", desc="main massflow out")  # add initial vals
@@ -227,13 +227,35 @@ if __name__ == "__main__":
     p = om.Problem()
     p.model = om.Group()
 
+    n_values = np.array(
+        [
+            3.15643098e-04,
+            1.00000000e-10,
+            1.53953831e-03,
+            1.00000000e-10,
+            1.00000000e-10,
+            1.00000000e-10,
+            1.59923925e-03,
+            1.00000000e-10,
+            1.00000000e-10,
+            1.00000000e-10,
+            9.18856891e-09,
+            4.30532475e-09,
+            1.00000000e-10,
+            2.63178529e-02,
+            1.00000000e-10,
+            1.00000000e-10,
+            4.79895474e-03,
+        ]
+    )
     des_vars = p.model.add_subsystem("des_vars", om.IndepVarComp(), promotes=["*"])
-    des_vars.add_output("Fl_I:stat:W", 100.0, units="lbm/s")
+    des_vars.add_output("Fl_I:stat:W", 33.65599979, units="lbm/s")
     des_vars.add_output("Fl_I:tot:T", 518.67, units="degR")
     des_vars.add_output("Fl_I:tot:P", 14.696, units="psi")
-    des_vars.add_output("Fl_I:tot:composition", [0.00031764, 0.00120854, 0.00248048, 0.05296942, 0.01427295])
-    des_vars.add_output("w_frac", 1.0, units=None)
+    des_vars.add_output("Fl_I:tot:composition", [0.00031564, 0.00153954, 0.00319848, 0.05263572, 0.01427624])
+    des_vars.add_output("w_frac", 0.05, units=None)
     des_vars.add_output("n_water", 0.0012402370022408862, units=None)
+    des_vars.add_output("n", n_values, units=None)
 
     inflow_comp = {"N": 0.0539157698, "O": 1.0, "Ar": 0.000323319235, "C": 2.0, "H": 4.0044}
     spec = wet_air
@@ -241,6 +263,7 @@ if __name__ == "__main__":
     thermo_kwargs = {"spec": spec, "inflow_composition": inflow_comp}
 
     p.model.add_subsystem("therm_sub", ThermoSub(**thermo_kwargs), promotes=["*"])
+
     # init_flow = Thermo(
     #     mode="total_TP", fl_name="Fl_I:tot", method="CEA", thermo_kwargs={"composition": inflow_comp, "spec": spec}
     # )
@@ -261,6 +284,7 @@ if __name__ == "__main__":
 
     # p.setup()
     p.run_model()
+    p.check_partials(compact_print=True, show_only_incorrect=False, method="fd")
 
     # names = init_flow_data.base_thermo.thermo.products
     # compounds = init_flow_data.base_thermo.chem_eq._outputs["n"]
@@ -271,11 +295,11 @@ if __name__ == "__main__":
     # print(compounds)
     # print(names)
 
-    print("Flow In:", p["Fl_I:stat:W"])
-    print("Flow Out:", p["Wout"])
-    print("Water out:", p["W_water"])
-    print("In Comp:", p["Fl_I:tot:composition"])
-    print("Out Comp:", p["composition_out"])
+    # print("Flow In:", p["Fl_I:stat:W"])
+    # print("Flow Out:", p["Wout"])
+    # print("Water out:", p["W_water"])
+    # print("In Comp:", p["Fl_I:tot:composition"])
+    # print("Out Comp:", p["composition_out"])
 
     # print("W", p["Fl_I:stat:W"], p["Fl_O:stat:W"], p["test1:stat:W"], p["test2:stat:W"])
     # print("T", p["Fl_I:tot:T"], p["Fl_O:tot:T"], p["test1:tot:T"], p["test2:tot:T"])

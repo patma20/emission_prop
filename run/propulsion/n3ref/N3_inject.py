@@ -764,7 +764,9 @@ if __name__ == "__main__":
 
     prob.set_solver_print(level=-1)
     prob.set_solver_print(level=2, depth=1)
-    prob.run_model()
+    # prob.run_model()
+    prob.check_partials(compact_print=True, show_only_incorrect=True, method="fd")
+
 
     # n = 4
     # w_inject = np.linspace(0.000001, 0.11, n)
@@ -799,24 +801,24 @@ if __name__ == "__main__":
     # print("Composition", prob["CRZ.burner.Fl_I:tot:composition"])
     # print("Composition", prob["CRZ.burner.Fl_O:*"])
 
-    inlet_prod_names = prob.model.TOC.inlet.real_flow.base_thermo.thermo.products
-    inlet_prod_concs = prob.model.TOC.inlet.real_flow.base_thermo.chem_eq._outputs["n"]
+    # inlet_prod_names = prob.model.TOC.inlet.real_flow.base_thermo.thermo.products
+    # inlet_prod_concs = prob.model.TOC.inlet.real_flow.base_thermo.chem_eq._outputs["n"]
 
-    inject_prod_names = prob.model.TOC.inject.vitiated_flow.base_thermo.thermo.products
-    inject_prod_concs = prob.model.TOC.inject.vitiated_flow.base_thermo.chem_eq._outputs["n"]
+    # inject_prod_names = prob.model.TOC.inject.vitiated_flow.base_thermo.thermo.products
+    # inject_prod_concs = prob.model.TOC.inject.vitiated_flow.base_thermo.chem_eq._outputs["n"]
 
-    print(inlet_prod_names)
-    print(inlet_prod_concs)
+    # print(inlet_prod_names)
+    # print(inlet_prod_concs)
 
-    print(inject_prod_names)
-    print(inject_prod_concs)
+    # print(inject_prod_names)
+    # print(inject_prod_concs)
 
-    print(100 * "#")
+    # print(100 * "#")
 
-    for i in range(len(inlet_prod_names)):
-        if inlet_prod_names[i] == "H2O":
-            print(inlet_prod_names[i], inlet_prod_concs[i])
-        if inject_prod_names[i] == "H2O":
-            print(inject_prod_names[i], inject_prod_concs[i])
+    # for i in range(len(inlet_prod_names)):
+    #     if inlet_prod_names[i] == "H2O":
+    #         print(inlet_prod_names[i], inlet_prod_concs[i])
+    #     if inject_prod_names[i] == "H2O":
+    #         print(inject_prod_names[i], inject_prod_concs[i])
 
     print("time", time.time() - st)
