@@ -22,7 +22,7 @@ import pycycle.api as pyc
 # ==============================================================================
 # Extension modules
 # ==============================================================================
-from N3_vapor_rec import N3, viewer, MPN3
+from N3_CLVR import N3, viewer, MPN3
 
 
 def N3_MDP_Opt_model(output_dir, save_res=True):
@@ -223,12 +223,12 @@ if __name__ == "__main__":
     st = time.time()
 
     # N2 generation
-    om.n2(prob)
+    # om.n2(prob)
 
     prob.set_solver_print(level=-1)
     prob.set_solver_print(level=2, depth=1)
     # prob.run_model()
-    # prob.check_partials(compact_print=True, show_only_incorrect=True, method="fd")
+    prob.check_partials(compact_print=True, show_only_incorrect=True, method="fd")
     # prob.check_totals(
     #     of=["CRZ.NOx.EINOx"],
     #     # wrt=["CRZ.NOx.P3", "CRZ.NOx.T3", "CRZ.NOx.T4"],

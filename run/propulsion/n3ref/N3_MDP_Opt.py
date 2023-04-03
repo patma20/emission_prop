@@ -9,44 +9,45 @@ import pycycle.api as pyc
 from N3ref import N3, viewer, MPN3
 
 
-def N3_MDP_Opt_model():
+def N3_MDP_Opt_model(output_dir):
 
     prob = om.Problem()
-    prob.model = MPN3(order_add=["bal"])
+    prob.model = MPN3()
+    # prob.model = MPN3(order_add=["bal"])
 
-    prob.model.pyc_add_cycle_param("ext_ratio.core_Cv", 0.9999)
-    prob.model.pyc_add_cycle_param("ext_ratio.byp_Cv", 0.9975)
+    # prob.model.pyc_add_cycle_param("ext_ratio.core_Cv", 0.9999)
+    # prob.model.pyc_add_cycle_param("ext_ratio.byp_Cv", 0.9975)
 
-    bal = prob.model.add_subsystem("bal", om.BalanceComp(), promotes=["RTO_T4"])
+    # bal = prob.model.add_subsystem("bal", om.BalanceComp(), promotes=["RTO_T4"])
 
-    bal.add_balance("TOC_BPR", val=23.7281, units=None, eq_units=None)
-    prob.model.connect("bal.TOC_BPR", "TOC.splitter.BPR")
-    prob.model.connect("CRZ.ext_ratio.ER", "bal.lhs:TOC_BPR")
+    # bal.add_balance("TOC_BPR", val=23.7281, units=None, eq_units=None)
+    # prob.model.connect("bal.TOC_BPR", "TOC.splitter.BPR")
+    # prob.model.connect("CRZ.ext_ratio.ER", "bal.lhs:TOC_BPR")
 
-    bal.add_balance("TOC_W", val=820.95, units="lbm/s", eq_units="degR", rhs_name="RTO_T4")
-    prob.model.connect("bal.TOC_W", "TOC.fc.W")
-    prob.model.connect("RTO.burner.Fl_O:tot:T", "bal.lhs:TOC_W")
+    # bal.add_balance("TOC_W", val=820.95, units="lbm/s", eq_units="degR", rhs_name="RTO_T4")
+    # prob.model.cct("bal.SLS_Fn_target", "SLS.balance.rhs:FAR")
+    # prob.model.connect("RTO.perf.Fn", "bal.lhs:SLS_Fn_target")
+    # prob.model.conneconnect("bal.TOC_W", "TOC.fc.W")
+    # prob.model.connect("RTO.burner.Fl_O:tot:T", "bal.lhs:TOC_W")
 
-    bal.add_balance(
-        "CRZ_Fn_target", val=5514.4, units="lbf", eq_units="lbf", use_mult=True, mult_val=0.9, ref0=5000.0, ref=7000.0
-    )
-    prob.model.connect("bal.CRZ_Fn_target", "CRZ.balance.rhs:FAR")
-    prob.model.connect("TOC.perf.Fn", "bal.lhs:CRZ_Fn_target")
-    prob.model.connect("CRZ.perf.Fn", "bal.rhs:CRZ_Fn_target")
+    # bal.add_balance(
+    #     "CRZ_Fn_target", val=5514.4, units="lbf", eq_units="lbf", use_mult=True, mult_val=0.9, ref0=5000.0, ref=7000.0
+    # )
+    # prob.model.connect("bal.CRZ_Fn_target", "CRZ.balance.rhs:FAR")
+    # prob.model.connect("TOC.perf.Fn", "bal.lhs:CRZ_Fn_target")
+    # prob.model.connect("CRZ.perf.Fn", "bal.rhs:CRZ_Fn_target")
 
-    bal.add_balance(
-        "SLS_Fn_target",
-        val=28620.8,
-        units="lbf",
-        eq_units="lbf",
-        use_mult=True,
-        mult_val=1.2553,
-        ref0=28000.0,
-        ref=30000.0,
-    )
-    prob.model.connect("bal.SLS_Fn_target", "SLS.balance.rhs:FAR")
-    prob.model.connect("RTO.perf.Fn", "bal.lhs:SLS_Fn_target")
-    prob.model.connect("SLS.perf.Fn", "bal.rhs:SLS_Fn_target")
+    # bal.add_balance(
+    #     "SLS_Fn_target",
+    #     val=28620.8,
+    #     units="lbf",
+    #     eq_units="lbf",
+    #     use_mult=True,
+    #     mult_val=1.2553,
+    #     ref0=28000.0,
+    #     ref=30000.0,
+    # )
+    # prob.model.connet("SLS.perf.Fn", "bal.rhs:SLS_Fn_target")
 
     # setup the optimization
     prob.driver = om.pyOptSparseDriver()
@@ -54,20 +55,28 @@ def N3_MDP_Opt_model():
     prob.driver.options["debug_print"] = ["desvars", "nl_cons", "objs"]
     # prob.driver.opt_settings={'Major step limit': 0.05}
 
-    prob.driver.opt_settings["Print file"] = os.path.join("../OUTPUT/N3_opt", "SNOPT_print.out")
-    prob.driver.opt_settings["Summary file"] = os.path.join("../OUTPUT/N3_opt", "SNOPT_summary.out")
+    modelname = "ref"
 
-    prob.model.add_design_var("fan:PRdes", lower=1.20, upper=1.4)
-    prob.model.add_design_var("lpc:PRdes", lower=2.5, upper=4.0)
-    prob.model.add_design_var("TOC.balance.rhs:hpc_PR", lower=40.0, upper=70.0, ref0=40.0, ref=70.0)
-    prob.model.add_design_var("RTO_T4", lower=3000.0, upper=3600.0, ref0=3000.0, ref=3600.0)
-    prob.model.add_design_var("bal.rhs:TOC_BPR", lower=1.35, upper=1.45, ref0=1.35, ref=1.45)
+    if os.path.isdir(output_dir) is False:
+        os.mkdir(output_dir)
+    prob.driver.opt_settings["Print file"] = os.path.join(output_dir, "SNOPT_print_" + modelname + ".out")
+    prob.driver.opt_settings["Summary file"] = os.path.join(output_dir, "SNOPT_summary_" + modelname + ".out")
+    prob.driver.hist_file = os.path.join(output_dir, "history_" + modelname + ".out")
+
+    # prob.driver.opt_settings["Print file"] = os.path.join("../OUTPUT/N3_opt", "SNOPT_print.out")
+    # prob.driver.opt_settings["Summary file"] = os.path.join("../OUTPUT/N3_opt", "SNOPT_summary.out")
+
+    # prob.model.add_design_var("fan:PRdes", lower=1.20, upper=1.4)
+    # prob.model.add_design_var("lpc:PRdes", lower=2.5, upper=4.0)
+    # prob.model.add_design_var("TOC.balance.rhs:hpc_PR", lower=40.0, upper=70.0, ref0=40.0, ref=70.0)
+    # prob.model.add_design_var("RTO_T4", lower=3000.0, upper=3600.0, ref0=3000.0, ref=3600.0)
+    # prob.model.add_design_var("bal.rhs:TOC_BPR", lower=1.35, upper=1.45, ref0=1.35, ref=1.45)
     prob.model.add_design_var("T4_ratio.TR", lower=0.5, upper=0.95, ref0=0.5, ref=0.95)
 
     prob.model.add_objective("CRZ.perf.TSFC", ref0=0.4, ref=0.5)
 
     # to add the constraint to the model
-    prob.model.add_constraint("TOC.fan_dia.FanDia", upper=100.0, ref=100.0)
+    # prob.model.add_constraint("TOC.fan_dia.FanDia", upper=100.0, ref=100.0)
     prob.model.add_constraint("TOC.perf.Fn", lower=5800.0, ref=6000.0)
 
     prob.model.set_input_defaults("RTO_T4", 3400.0, units="degR")
@@ -77,11 +86,12 @@ def N3_MDP_Opt_model():
 
 if __name__ == "__main__":
 
-    prob = N3_MDP_Opt_model()
+    prob = N3_MDP_Opt_model(output_dir="../OUTPUT/N3_opt/N3ref/N3_T4R")
 
     prob.setup()
 
     # Define the design point
+    prob.set_val("TOC.fc.W", 820.44097898, units="lbm/s")
     prob.set_val("TOC.splitter.BPR", 23.7281)
     prob.set_val("TOC.balance.rhs:hpc_PR", 55.0)
 
@@ -89,7 +99,7 @@ if __name__ == "__main__":
     prob.set_val("SLS.fc.MN", 0.001)
     prob.set_val("SLS.balance.rhs:FAR", 28620.9, units="lbf")
     prob.set_val("CRZ.balance.rhs:FAR", 5466.5, units="lbf")
-    prob.set_val("bal.rhs:TOC_BPR", 1.40)
+    # prob.set_val("bal.rhs:TOC_BPR", 1.40)
     prob.set_val("T4_ratio.TR", 0.926470588)
     prob.set_val("fan:PRdes", 1.300)
     prob.set_val("lpc:PRdes", 3.000)
@@ -97,7 +107,7 @@ if __name__ == "__main__":
 
     # Set inital guesses for balances
     prob["TOC.balance.FAR"] = 0.02650
-    prob["bal.TOC_W"] = 820.95
+    # prob["bal.TOC_W"] = 820.95
     prob["TOC.balance.lpt_PR"] = 10.937
     prob["TOC.balance.hpt_PR"] = 4.185
     prob["TOC.fc.balance.Pt"] = 5.272
@@ -142,6 +152,13 @@ if __name__ == "__main__":
     prob.set_solver_print(level=2, depth=1)
     prob.run_driver()
 
+    save_res = True
+    if save_res is True:
+        with open(f"{output_dir}/outputs.out", "w") as file:
+            prob.model.list_outputs(prom_name=True, units=True, out_stream=file)
+
+        with open(f"{output_dir}/inputs.out", "w") as file:
+            prob.model.list_inputs(prom_name=True, units=True, out_stream=file)
     # for pt in ["TOC"] + prob.model.od_pts:
     #     viewer(prob, pt)
 
