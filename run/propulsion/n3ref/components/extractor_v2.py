@@ -127,7 +127,7 @@ class WaterBleed(Element):
 
     def initialize(self):
         self.options.declare("statics", default=True, desc="If True, calculate static properties.")
-        self.options.declare("design", default=False, types=bool, desc="If True, set DP as water injection.")
+        self.options.declare("design_water", default=False, types=bool, desc="If True, set DP as water injection.")
 
         self.default_des_od_conns = [
             # (design src, off-design target)
@@ -145,7 +145,8 @@ class WaterBleed(Element):
         thermo_method = self.options["thermo_method"]  # will always be CEA for this component
         thermo_data = self.options["thermo_data"]  #
         statics = self.options["statics"]
-        design = self.options["design"]
+        # design = self.options["design"]
+        design_water = self.options["design_water"]
         composition = self.Fl_O_data["Fl_O"]  # dictionary of elements strings and associated elemental ratio
 
         # Compute equilibrium composition before extraction to get moles of H2O in flow
@@ -187,7 +188,7 @@ class WaterBleed(Element):
         self.add_subsystem("updated_flow", updated_flow, promotes_inputs=prom_in, promotes_outputs=["Fl_O:*"])
 
         if statics:
-            if design:
+            if design_water:
                 # Calculate static properties.
                 out_stat = Thermo(
                     mode="static_MN",

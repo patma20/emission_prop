@@ -57,7 +57,7 @@ class Injector(Element):
     def initialize(self):
 
         self.options.declare("statics", default=True, desc="If True, calculate static properties.")
-        self.options.declare("design", default=False, types=bool, desc="If True, set DP as water injection.")
+        self.options.declare("design_water", default=False, types=bool, desc="If True, set DP as water injection.")
         self.options.declare(
             "reactant",
             default=False,
@@ -100,7 +100,7 @@ class Injector(Element):
 
         # inflow_composition = self.Fl_I_data["Fl_I"]
         air_react_composition = self.Fl_O_data["Fl_O"]
-        design = self.options["design"]
+        design_water = self.options["design_water"]
         statics = self.options["statics"]
 
         mix_name = self.options["mix_name"]
@@ -159,7 +159,7 @@ class Injector(Element):
         # self.connect("p_loss.Pt_out", "vitiated_flow.P")
 
         if statics:
-            if design:
+            if design_water:
                 # Calculate static properties.
 
                 out_stat = Thermo(

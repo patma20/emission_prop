@@ -11,7 +11,7 @@ A holding place for OpenMDAO components that don't belong in any particular scri
 # ==============================================================================
 import openmdao.api as om
 import numpy as np
-
+import components.constants as con
 
 # ==============================================================================
 # Extension modules
@@ -19,20 +19,33 @@ import numpy as np
 
 
 class TSEC(om.ExplicitComponent):
+    def initialize(self):
+        self.options.declare("use_h2", default=False, types=bool, desc="If True, use hydrogen as the fuel.")
+
     def setup(self):
         self.add_input("TSFC", val=0.4, desc="Thrust-specific fuel consumption", units="lbm/(h*lbf)")
-        self.add_input("LHV", val=18564, desc="Lower heating value of fuel", units="Btu/lbm")
+        # self.add_input("LHV", val=18564, desc="Lower heating value of fuel", units="Btu/lbm")
 
         self.add_output("TSEC", val=800.0, desc="Thrust-specific energy consumption", units="Btu/(h*lbf)")
 
-        self.declare_partials("TSEC", ["TSFC", "LHV"])
+        self.declare_partials("TSEC", "TSFC")
 
     def compute(self, inputs, outputs):
-        outputs["TSEC"] = inputs["TSFC"] * inputs["LHV"]
+        if self.options["use_h2"]:
+            LHV = con.LHV_h2
+        else:
+            LHV = con.LHV_JetA
+
+        outputs["TSEC"] = inputs["TSFC"] * LHV
 
     def compute_partials(self, inputs, J):
-        J["TSEC", "TSFC"] = inputs["LHV"]
-        J["TSEC", "LHV"] = inputs["TSFC"]
+        if self.options["use_h2"]:
+            LHV = con.LHV_h2
+        else:
+            LHV = con.LHV_JetA
+
+        J["TSEC", "TSFC"] = LHV
+        # J["TSEC", "LHV"] = inputs["TSFC"]
 
 
 class NOxT4(om.ExplicitComponent):
