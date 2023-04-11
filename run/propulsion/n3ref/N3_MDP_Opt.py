@@ -25,9 +25,9 @@ def N3_MDP_Opt_model(output_dir):
     # prob.model.connect("CRZ.ext_ratio.ER", "bal.lhs:TOC_BPR")
 
     # bal.add_balance("TOC_W", val=820.95, units="lbm/s", eq_units="degR", rhs_name="RTO_T4")
-    # prob.model.cct("bal.SLS_Fn_target", "SLS.balance.rhs:FAR")
+    # prob.model.connect("bal.SLS_Fn_target", "SLS.balance.rhs:FAR")
     # prob.model.connect("RTO.perf.Fn", "bal.lhs:SLS_Fn_target")
-    # prob.model.conneconnect("bal.TOC_W", "TOC.fc.W")
+    # prob.model.connect("bal.TOC_W", "TOC.fc.W")
     # prob.model.connect("RTO.burner.Fl_O:tot:T", "bal.lhs:TOC_W")
 
     # bal.add_balance(
