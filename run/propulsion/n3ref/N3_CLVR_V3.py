@@ -778,7 +778,7 @@ if __name__ == "__main__":
 
     import time
 
-    prob = N3ref_model(use_h2=True)
+    prob = N3ref_model(use_h2=False)
 
     prob.setup()
     # om.n2(prob)
@@ -880,7 +880,7 @@ if __name__ == "__main__":
     check_cons_mass = False
     run_sweep = False
     save_res = True
-    print_outputs = False
+    print_outputs = True
 
     if run_sweep:
         point = "CRZ"
@@ -977,11 +977,11 @@ if __name__ == "__main__":
                 f,
             )
     else:
-        wfrac = 0.05
-        prob.set_val("TOC.extract.sub_flow.w_frac", wfrac)
+        # wfrac = 0.05
+        # prob.set_val("TOC.extract.sub_flow.w_frac", wfrac)
         # prob.set_val("RTO.extract.sub_flow.w_frac", wfrac)
         # prob.set_val("SLS.extract.sub_flow.w_frac", wfrac)
-        prob.set_val("CRZ.extract.sub_flow.w_frac", wfrac)
+        # prob.set_val("CRZ.extract.sub_flow.w_frac", wfrac)
 
         # prob.model.RTO.nonlinear_solver.options["maxiter"] = 2
         # prob.model.SLS.nonlinear_solver.options["maxiter"] = 0
@@ -989,9 +989,27 @@ if __name__ == "__main__":
         # prob.model.nonlinear_solver.options["maxiter"] = 0
         # prob.model.nonlinear_solver.options["err_on_non_converge"] = False
 
-        prob.run_model()
+        # prob.run_model()
+        RTO_vals = np.linspace(3400, 3200, 10)
+        wfrac = np.linspace(0.05, 0.1, 10)
+
+        for i in range(10):
+            print(f"\n\nSolving RTO_T4: {RTO_vals[i]} wfrac: {wfrac[i]}\n\n")
+            prob.set_val("RTO_T4", RTO_vals[i])
+            prob.set_val("T4_ratio.TR", 0.91007225)
+            prob.set_val("TOC.balance.rhs:hpc_PR", 61.92218429)
+            prob.set_val("fan:PRdes", 1.28596094)
+            prob.set_val("lpc:PRdes", 4.0)
+            prob.set_val("CRZ.extract.sub_flow.w_frac", wfrac[i])
+            prob.run_model()
+
+        CRZ_wfrac = np.linspace(0.11, 0.3, 20)
+        for wfrac in CRZ_wfrac:
+            print(f"\n\nSolving CRZ.wfrac: {wfrac}\n\n")
+            prob.set_val("CRZ.extract.sub_flow.w_frac", wfrac)
+            prob.run_model()
         # prob.model.list_outputs(residuals=True, explicit=True, includes="RTO*", residuals_tol=1e-2, prom_name=True)
-        prob.check_partials(compact_print=True, show_only_incorrect=True, method="fd")
+        # prob.check_partials(compact_print=True, show_only_incorrect=True, method="fd")
 
         # print("n: ", prob.model.TOC.duct5.real_flow.base_thermo.chem_eq._outputs["n"])
         # print("Win: ", prob["TOC.extract.Fl_I:stat:W"])
